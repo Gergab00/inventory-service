@@ -65,6 +65,113 @@ describe('AppController (e2e)', () => {
     expect(typeof response.body.timestamp).toBe('string');
   });
 
+  it('creates and retrieves a product', async () => {
+    const createResponse = await request(app.getHttpServer())
+      .post(`${API_PREFIX}/products`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .send({
+        title: 'Nintendo Switch OLED',
+        brand: 'Nintendo',
+        externalIdentifiers: [{ type: 'asin', value: 'B07TWW67JS' }],
+        attributes: { color: 'White' },
+      })
+      .expect(201);
+
+    expect(createResponse.body.meta.requestId).toEqual(expect.any(String));
+    expect(createResponse.body.data.id).toMatch(/^prd_/);
+
+    const productId = createResponse.body.data.id as string;
+
+    const getResponse = await request(app.getHttpServer())
+      .get(`${API_PREFIX}/products/${productId}`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .expect(200);
+
+    expect(getResponse.body.data).toMatchObject({
+      id: productId,
+      title: 'Nintendo Switch OLED',
+      brand: 'Nintendo',
+      status: 'active',
+      externalIdentifiers: [{ type: 'asin', value: 'B07TWW67JS' }],
+      attributes: { color: 'White' },
+      imageReferences: [],
+    });
+  });
+
+  it('lists, updates images, and soft deletes a product', async () => {
+    const createResponse = await request(app.getHttpServer())
+      .post(`${API_PREFIX}/products`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .send({
+        title: 'PlayStation 5',
+        brand: 'Sony',
+        externalIdentifiers: [{ type: 'asin', value: 'B0PS5' }],
+      })
+      .expect(201);
+
+    const productId = createResponse.body.data.id as string;
+
+    const listResponse = await request(app.getHttpServer())
+      .get(`${API_PREFIX}/products?page=1&pageSize=20&title=playstation`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .expect(200);
+
+    expect(listResponse.body.data).toHaveLength(1);
+    expect(listResponse.body.meta.pagination).toMatchObject({
+      page: 1,
+      pageSize: 20,
+      total: 1,
+      totalPages: 1,
+    });
+
+    const updateResponse = await request(app.getHttpServer())
+      .put(`${API_PREFIX}/products/${productId}`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .send({
+        title: 'PlayStation 5 Slim',
+        attributes: { color: 'White' },
+      })
+      .expect(200);
+
+    expect(updateResponse.body.data).toMatchObject({
+      id: productId,
+      title: 'PlayStation 5 Slim',
+      brand: 'Sony',
+      status: 'active',
+      attributes: { color: 'White' },
+    });
+
+    const imageResponse = await request(app.getHttpServer())
+      .put(`${API_PREFIX}/products/${productId}/images`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .send({
+        images: [
+          { url: 'https://cdn.example.com/ps5-primary.jpg', role: 'primary' },
+          { url: 'https://cdn.example.com/ps5-secondary.jpg', role: 'secondary' },
+        ],
+      })
+      .expect(200);
+
+    expect(imageResponse.body.data.imageReferences).toHaveLength(2);
+
+    const imageListResponse = await request(app.getHttpServer())
+      .get(`${API_PREFIX}/products/${productId}/image-references`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .expect(200);
+
+    expect(imageListResponse.body.data).toHaveLength(2);
+
+    const deleteResponse = await request(app.getHttpServer())
+      .delete(`${API_PREFIX}/products/${productId}`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .expect(200);
+
+    expect(deleteResponse.body.data).toMatchObject({
+      id: productId,
+      status: 'inactive',
+    });
+  });
+
   it('/docs (GET)', async () => {
     const response = await request(app.getHttpServer()).get('/docs').expect(200);
 
