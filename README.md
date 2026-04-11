@@ -52,6 +52,15 @@ $ pnpm start:dev
 
 Luego abre `http://localhost:3000/docs` para navegar y probar la API desde Scalar.
 
+### Documentación técnica complementaria
+
+Además de esta guía rápida, el repositorio ahora incluye documentación más detallada en:
+
+- `docs/README.md`
+- `docs/architecture/project-architecture-blueprint.md`
+- `docs/guides/como-extender-inventory-service.md`
+- `docs/adr/`
+
 ### Autenticación mínima por `api_key`
 
 Toda llamada a la API pública bajo `/api/v1/**` debe enviar el header `api_key` y su valor debe coincidir con `API_KEY` del entorno.
