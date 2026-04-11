@@ -76,4 +76,32 @@ describe('validateEnvironment', () => {
       }),
     ).toThrow('Environment variable DATABASE_TYPE must be one of: in-memory, mongodb.');
   });
+
+  it('should throw when DATABASE_TYPE is mongodb and MONGODB_URI is missing', () => {
+    expect(() =>
+      validateEnvironment({
+        NODE_ENV: 'development',
+        PORT: '3000',
+        API_KEY: 'local-api-key',
+        DATABASE_TYPE: 'mongodb',
+        MONGODB_DB_NAME: 'inventory-service',
+      }),
+    ).toThrow(
+      'Environment variable MONGODB_URI is required when DATABASE_TYPE is mongodb.',
+    );
+  });
+
+  it('should throw when DATABASE_TYPE is mongodb and MONGODB_DB_NAME is missing', () => {
+    expect(() =>
+      validateEnvironment({
+        NODE_ENV: 'development',
+        PORT: '3000',
+        API_KEY: 'local-api-key',
+        DATABASE_TYPE: 'mongodb',
+        MONGODB_URI: 'mongodb://localhost:27017',
+      }),
+    ).toThrow(
+      'Environment variable MONGODB_DB_NAME is required when DATABASE_TYPE is mongodb.',
+    );
+  });
 });

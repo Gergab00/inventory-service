@@ -13,6 +13,19 @@ describe('resolvePersistenceAdapter', () => {
     expect(resolvedAdapter).toBe(inMemoryAdapter);
   });
 
+  it('returns the mongodb adapter when DATABASE_TYPE is mongodb', () => {
+    const mongodbAdapter = { adapter: 'mongodb' };
+
+    const resolvedAdapter = resolvePersistenceAdapter({
+      adapterName: 'ProductRepository',
+      databaseType: 'mongodb',
+      inMemoryAdapter: { adapter: 'in-memory' },
+      mongodbAdapter,
+    });
+
+    expect(resolvedAdapter).toBe(mongodbAdapter);
+  });
+
   it('throws a clear error when the selected adapter is not implemented yet', () => {
     expect(() =>
       resolvePersistenceAdapter({

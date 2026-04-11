@@ -116,10 +116,28 @@ export function validateEnvironment(
   config: Record<string, unknown>,
 ): EnvironmentVariables {
   const nodeEnv = (config.NODE_ENV ?? 'development') as string;
+  const databaseType = parseDatabaseType(config.DATABASE_TYPE);
+  const mongodbUri = parseOptionalString(config.MONGODB_URI, 'MONGODB_URI');
+  const mongodbDbName = parseOptionalString(
+    config.MONGODB_DB_NAME,
+    'MONGODB_DB_NAME',
+  );
 
   if (!ALLOWED_NODE_ENVIRONMENTS.includes(nodeEnv as NodeEnvironment)) {
     throw new Error(
       `Environment variable NODE_ENV must be one of: ${ALLOWED_NODE_ENVIRONMENTS.join(', ')}.`,
+    );
+  }
+
+  if (databaseType === 'mongodb' && mongodbUri === undefined) {
+    throw new Error(
+      'Environment variable MONGODB_URI is required when DATABASE_TYPE is mongodb.',
+    );
+  }
+
+  if (databaseType === 'mongodb' && mongodbDbName === undefined) {
+    throw new Error(
+      'Environment variable MONGODB_DB_NAME is required when DATABASE_TYPE is mongodb.',
     );
   }
 
@@ -134,11 +152,8 @@ export function validateEnvironment(
       'OPENAPI_JSON_PATH',
       '/openapi.json',
     ),
-    DATABASE_TYPE: parseDatabaseType(config.DATABASE_TYPE),
-    MONGODB_URI: parseOptionalString(config.MONGODB_URI, 'MONGODB_URI'),
-    MONGODB_DB_NAME: parseOptionalString(
-      config.MONGODB_DB_NAME,
-      'MONGODB_DB_NAME',
-    ),
+    DATABASE_TYPE: databaseType,
+    MONGODB_URI: mongodbUri,
+    MONGODB_DB_NAME: mongodbDbName,
   };
 }

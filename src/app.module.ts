@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AppConfigService } from './infrastructure/config/app-config.service';
 import { validateEnvironment } from './infrastructure/config/env.validation';
+import { MongoPersistenceModule } from './infrastructure/persistence/mongodb/mongodb.module';
 import { ApiKeyGuard } from './interfaces/http/guards/api-key.guard';
 import { ProductsModule } from './modules/products/products.module';
 import { WarehousesModule } from './modules/warehouses/warehouses.module';
@@ -18,6 +19,7 @@ import { InventoryModule } from './modules/inventory/inventory.module';
       cache: true,
       validate: validateEnvironment,
     }),
+    MongoPersistenceModule,
     ProductsModule,
     WarehousesModule,
     InventoryModule,

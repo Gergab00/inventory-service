@@ -4,6 +4,7 @@ interface ResolvePersistenceAdapterOptions<TAdapter> {
   readonly adapterName: string;
   readonly databaseType: DatabaseType;
   readonly inMemoryAdapter: TAdapter;
+  readonly mongodbAdapter?: TAdapter;
 }
 
 export function resolvePersistenceAdapter<TAdapter>(
@@ -11,6 +12,10 @@ export function resolvePersistenceAdapter<TAdapter>(
 ): TAdapter {
   if (options.databaseType === 'in-memory') {
     return options.inMemoryAdapter;
+  }
+
+  if (options.databaseType === 'mongodb' && options.mongodbAdapter !== undefined) {
+    return options.mongodbAdapter;
   }
 
   throw new Error(
