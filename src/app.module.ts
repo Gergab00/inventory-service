@@ -8,6 +8,7 @@ import { validateEnvironment } from './infrastructure/config/env.validation';
 import { ApiKeyGuard } from './interfaces/http/guards/api-key.guard';
 import { ProductsModule } from './modules/products/products.module';
 import { WarehousesModule } from './modules/warehouses/warehouses.module';
+import { InventoryModule } from './modules/inventory/inventory.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { WarehousesModule } from './modules/warehouses/warehouses.module';
     }),
     ProductsModule,
     WarehousesModule,
+    InventoryModule,
   ],
   controllers: [AppController],
   providers: [

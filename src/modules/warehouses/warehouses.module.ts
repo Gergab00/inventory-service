@@ -22,5 +22,6 @@ import { WarehousesController } from './interfaces/http/warehouses.controller';
       useExisting: InMemoryWarehouseRepository,
     },
   ],
+  exports: [GetWarehouseByIdUseCase],
 })
 export class WarehousesModule {}

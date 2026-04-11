@@ -256,6 +256,168 @@ describe('AppController (e2e)', () => {
     });
   });
 
+  it('registers inventory entries and exposes product availability', async () => {
+    const productResponse = await request(app.getHttpServer())
+      .post(`${API_PREFIX}/products`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .send({
+        title: 'Xbox Series X',
+        brand: 'Microsoft',
+        externalIdentifiers: [{ type: 'asin', value: 'B08H75RTZ8' }],
+      })
+      .expect(201);
+
+    const warehouseResponse = await request(app.getHttpServer())
+      .post(`${API_PREFIX}/warehouses`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .send({
+        code: 'GDL-01',
+        name: 'Almacén Guadalajara',
+        processingTimeDays: 2,
+      })
+      .expect(201);
+
+    const productId = productResponse.body.data.id as string;
+    const warehouseId = warehouseResponse.body.data.id as string;
+
+    const entryResponse = await request(app.getHttpServer())
+      .post(`${API_PREFIX}/inventory/entries`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .send({
+        productId,
+        warehouseId,
+        quantity: 10,
+        unitCost: { amount: 9500, currency: 'MXN' },
+        sourceReference: { type: 'purchase-order', id: 'PO-001' },
+      })
+      .expect(201);
+
+    expect(entryResponse.body.data.type).toBe('entry');
+    expect(entryResponse.body.data.quantity).toBe(10);
+    expect(entryResponse.body.data.unitCost).toMatchObject({ amount: 9500, currency: 'MXN' });
+
+    const availabilityResponse = await request(app.getHttpServer())
+      .get(`${API_PREFIX}/inventory/products/${productId}/availability`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .expect(200);
+
+    expect(availabilityResponse.body.data).toMatchObject({
+      productId,
+      totalAvailableQuantity: 10,
+      warehouses: [
+        {
+          warehouseId,
+          availableQuantity: 10,
+        },
+      ],
+    });
+  });
+
+  it('consumes FIFO stock, lists movements, and exposes lots', async () => {
+    const productResponse = await request(app.getHttpServer())
+      .post(`${API_PREFIX}/products`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .send({
+        title: 'Steam Deck OLED',
+        brand: 'Valve',
+        externalIdentifiers: [{ type: 'asin', value: 'B0STEAMDECK' }],
+      })
+      .expect(201);
+
+    const warehouseResponse = await request(app.getHttpServer())
+      .post(`${API_PREFIX}/warehouses`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .send({
+        code: 'QRO-01',
+        name: 'Almacén Querétaro',
+        processingTimeDays: 1,
+      })
+      .expect(201);
+
+    const productId = productResponse.body.data.id as string;
+    const warehouseId = warehouseResponse.body.data.id as string;
+
+    await request(app.getHttpServer())
+      .post(`${API_PREFIX}/inventory/entries`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .send({
+        productId,
+        warehouseId,
+        quantity: 5,
+        unitCost: { amount: 8800, currency: 'MXN' },
+        sourceReference: { type: 'purchase-order', id: 'PO-100' },
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post(`${API_PREFIX}/inventory/entries`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .send({
+        productId,
+        warehouseId,
+        quantity: 7,
+        unitCost: { amount: 9100, currency: 'MXN' },
+        sourceReference: { type: 'purchase-order', id: 'PO-101' },
+      })
+      .expect(201);
+
+    const exitResponse = await request(app.getHttpServer())
+      .post(`${API_PREFIX}/inventory/exits`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .send({
+        productId,
+        warehouseId,
+        quantity: 6,
+        reference: { type: 'order', id: 'ORD-01' },
+      })
+      .expect(201);
+
+    expect(exitResponse.body.data.type).toBe('exit');
+    expect(exitResponse.body.data.quantity).toBe(6);
+
+    const availabilityResponse = await request(app.getHttpServer())
+      .get(`${API_PREFIX}/inventory/products/${productId}/availability`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .expect(200);
+
+    expect(availabilityResponse.body.data.totalAvailableQuantity).toBe(6);
+    expect(availabilityResponse.body.data.warehouses[0]).toMatchObject({
+      warehouseId,
+      availableQuantity: 6,
+    });
+
+    const lotsResponse = await request(app.getHttpServer())
+      .get(`${API_PREFIX}/inventory/products/${productId}`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .expect(200);
+
+    expect(lotsResponse.body.data).toHaveLength(2);
+    expect(lotsResponse.body.data[0].availableQuantity).toBe(0);
+    expect(lotsResponse.body.data[1].availableQuantity).toBe(6);
+
+    const lotId = lotsResponse.body.data[1].lotId as string;
+
+    const lotResponse = await request(app.getHttpServer())
+      .get(`${API_PREFIX}/inventory/lots/${lotId}`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .expect(200);
+
+    expect(lotResponse.body.data).toMatchObject({
+      lotId,
+      productId,
+      warehouseId,
+      availableQuantity: 6,
+    });
+
+    const movementsResponse = await request(app.getHttpServer())
+      .get(`${API_PREFIX}/inventory/movements?productId=${productId}&warehouseId=${warehouseId}`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .expect(200);
+
+    expect(movementsResponse.body.data).toHaveLength(3);
+    expect(movementsResponse.body.meta.pagination.total).toBe(3);
+  });
+
   it('/docs (GET)', async () => {
     const response = await request(app.getHttpServer()).get('/docs').expect(200);
 

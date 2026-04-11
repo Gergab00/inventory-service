@@ -24,5 +24,6 @@ import { ProductsController } from './interfaces/http/products.controller';
       useExisting: InMemoryProductRepository,
     },
   ],
+  exports: [GetProductByIdUseCase],
 })
 export class ProductsModule {}
