@@ -23,7 +23,33 @@
 
 ## Description
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+Servicio backend `inventory-service` construido con NestJS + TypeScript para gestionar inventario, productos y futuras integraciones, siguiendo principios de Clean Architecture.
+
+## Documentación interactiva con Scalar
+
+La aplicación expone documentación OpenAPI mediante Scalar para explorar y probar los endpoints disponibles desde una interfaz web.
+
+### Rutas disponibles
+
+- `GET /docs` — interfaz interactiva de Scalar
+- `GET /openapi.json` — especificación OpenAPI en formato JSON
+- `GET /health` — endpoint técnico simple para validar disponibilidad
+
+### Configuración útil
+
+- `DOCS_ENABLED=true` — habilita o deshabilita la documentación
+- `DOCS_PATH=/docs` — ruta donde se publica Scalar
+- `OPENAPI_JSON_PATH=/openapi.json` — ruta del documento OpenAPI
+
+### Uso local
+
+```bash
+$ pnpm install
+$ $env:API_KEY='local-api-key'
+$ pnpm start:dev
+```
+
+Luego abre `http://localhost:3000/docs` para navegar y probar la API desde Scalar.
 
 ## Project setup
 

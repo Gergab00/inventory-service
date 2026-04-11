@@ -26,6 +26,57 @@ function parseApiKey(value: unknown): string {
   return apiKey;
 }
 
+function parseBoolean(
+  value: unknown,
+  variableName: string,
+  defaultValue: boolean,
+): boolean {
+  if (value === undefined || value === null || value === '') {
+    return defaultValue;
+  }
+
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value !== 'string') {
+    throw new Error(`Environment variable ${variableName} must be a boolean value.`);
+  }
+
+  const normalizedValue = value.trim().toLowerCase();
+
+  if (['true', '1', 'yes'].includes(normalizedValue)) {
+    return true;
+  }
+
+  if (['false', '0', 'no'].includes(normalizedValue)) {
+    return false;
+  }
+
+  throw new Error(`Environment variable ${variableName} must be a boolean value.`);
+}
+
+function parseRoutePath(
+  value: unknown,
+  variableName: string,
+  defaultValue: string,
+): string {
+  const resolvedPath =
+    typeof value === 'string' && value.trim().length > 0
+      ? value.trim()
+      : defaultValue;
+
+  if (!resolvedPath.startsWith('/')) {
+    throw new Error(`Environment variable ${variableName} must start with "/".`);
+  }
+
+  if (resolvedPath.length > 1 && resolvedPath.endsWith('/')) {
+    return resolvedPath.slice(0, -1);
+  }
+
+  return resolvedPath;
+}
+
 export function validateEnvironment(
   config: Record<string, unknown>,
 ): EnvironmentVariables {
@@ -41,5 +92,12 @@ export function validateEnvironment(
     NODE_ENV: nodeEnv as NodeEnvironment,
     PORT: parsePort(config.PORT ?? '3000'),
     API_KEY: parseApiKey(config.API_KEY),
+    DOCS_ENABLED: parseBoolean(config.DOCS_ENABLED, 'DOCS_ENABLED', true),
+    DOCS_PATH: parseRoutePath(config.DOCS_PATH, 'DOCS_PATH', '/docs'),
+    OPENAPI_JSON_PATH: parseRoutePath(
+      config.OPENAPI_JSON_PATH,
+      'OPENAPI_JSON_PATH',
+      '/openapi.json',
+    ),
   };
 }

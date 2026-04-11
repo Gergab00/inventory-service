@@ -12,6 +12,9 @@ describe('validateEnvironment', () => {
       NODE_ENV: 'development',
       PORT: 3000,
       API_KEY: 'local-api-key',
+      DOCS_ENABLED: true,
+      DOCS_PATH: '/docs',
+      OPENAPI_JSON_PATH: '/openapi.json',
     });
   });
 
@@ -32,5 +35,16 @@ describe('validateEnvironment', () => {
         PORT: '3000',
       }),
     ).toThrow('Environment variable API_KEY is required.');
+  });
+
+  it('should throw when DOCS_PATH does not start with a slash', () => {
+    expect(() =>
+      validateEnvironment({
+        NODE_ENV: 'development',
+        PORT: '3000',
+        API_KEY: 'local-api-key',
+        DOCS_PATH: 'docs',
+      }),
+    ).toThrow('Environment variable DOCS_PATH must start with "/".');
   });
 });

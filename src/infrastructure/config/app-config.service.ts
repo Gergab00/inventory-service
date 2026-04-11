@@ -20,6 +20,18 @@ export class AppConfigService {
     return this.configService.getOrThrow<string>('API_KEY');
   }
 
+  get docsEnabled(): boolean {
+    return this.configService.getOrThrow<boolean>('DOCS_ENABLED');
+  }
+
+  get docsPath(): string {
+    return this.configService.getOrThrow<string>('DOCS_PATH');
+  }
+
+  get openApiJsonPath(): string {
+    return this.configService.getOrThrow<string>('OPENAPI_JSON_PATH');
+  }
+
   get isProduction(): boolean {
     return this.nodeEnv === 'production';
   }
