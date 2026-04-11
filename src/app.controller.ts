@@ -1,9 +1,10 @@
 import { Controller, Get } from '@nestjs/common';
-import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { AppService } from './app.service';
 import { HealthResponseDto } from './interfaces/http/dto/health-response.dto';
 
 @ApiTags('system')
+@ApiSecurity('api_key')
 @Controller()
 export class AppController {
   constructor(private readonly appService: AppService) {}

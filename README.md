@@ -33,7 +33,8 @@ La aplicación expone documentación OpenAPI mediante Scalar para explorar y pro
 
 - `GET /docs` — interfaz interactiva de Scalar
 - `GET /openapi.json` — especificación OpenAPI en formato JSON
-- `GET /health` — endpoint técnico simple para validar disponibilidad
+- `GET /api/v1/health` — endpoint técnico simple para validar disponibilidad
+- `GET /api/v1` — endpoint base del servicio
 
 ### Configuración útil
 
@@ -50,6 +51,18 @@ $ pnpm start:dev
 ```
 
 Luego abre `http://localhost:3000/docs` para navegar y probar la API desde Scalar.
+
+### Autenticación mínima por `api_key`
+
+Toda llamada a la API pública bajo `/api/v1/**` debe enviar el header `api_key` y su valor debe coincidir con `API_KEY` del entorno.
+
+Ejemplo:
+
+```bash
+curl -H "api_key: local-api-key" http://localhost:3000/api/v1/health
+```
+
+Si el header no está presente o no coincide, la API responde `401 Unauthorized`.
 
 ## Project setup
 

@@ -21,6 +21,17 @@ export async function setupApiDocumentation(
         'Documentación interactiva para explorar y probar los endpoints expuestos por inventory-service.',
       )
       .setVersion('1.0.0')
+      .addApiKey(
+        {
+          type: 'apiKey',
+          in: 'header',
+          name: 'api_key',
+          description:
+            'Clave obligatoria para consumir la API pública versionada. Debe coincidir con API_KEY del entorno.',
+        },
+        'api_key',
+      )
+      .addSecurityRequirements('api_key')
       .build(),
   );
 
