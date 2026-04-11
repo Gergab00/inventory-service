@@ -1,0 +1,26 @@
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { EnvironmentVariables, NodeEnvironment } from './environment-variables';
+
+@Injectable()
+export class AppConfigService {
+  constructor(
+    private readonly configService: ConfigService<EnvironmentVariables, true>,
+  ) {}
+
+  get nodeEnv(): NodeEnvironment {
+    return this.configService.getOrThrow<NodeEnvironment>('NODE_ENV');
+  }
+
+  get port(): number {
+    return this.configService.getOrThrow<number>('PORT');
+  }
+
+  get apiKey(): string {
+    return this.configService.getOrThrow<string>('API_KEY');
+  }
+
+  get isProduction(): boolean {
+    return this.nodeEnv === 'production';
+  }
+}
