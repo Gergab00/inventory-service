@@ -18,7 +18,7 @@ export async function setupApiDocumentation(
     new DocumentBuilder()
       .setTitle('Inventory Service API')
       .setDescription(
-        'Documentación interactiva para explorar y probar los endpoints expuestos por inventory-service.',
+        'Documentación interactiva para explorar y probar los endpoints expuestos por inventory-service. Las respuestas exitosas usan `data + meta.requestId` y los errores HTTP exponen un envelope uniforme con `error.code`, `error.message`, `error.details[]` y `meta.requestId`.',
       )
       .setVersion('1.0.0')
       .addApiKey(

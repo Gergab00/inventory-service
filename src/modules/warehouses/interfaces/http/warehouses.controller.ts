@@ -1,10 +1,8 @@
 import {
   Body,
-  ConflictException,
   Controller,
   Delete,
   Get,
-  NotFoundException,
   Param,
   Post,
   Put,
@@ -17,13 +15,14 @@ import {
   ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger';
-import { randomUUID } from 'node:crypto';
+import { API_ERROR_CODES } from '../../../../interfaces/http/errors/api-error-codes';
+import { ApiHttpException } from '../../../../interfaces/http/errors/api-http.exception';
+import { createRequestId } from '../../../../interfaces/http/support/request-context';
 import { CreateWarehouseUseCase } from '../../application/use-cases/create-warehouse.use-case';
 import { GetWarehouseByIdUseCase } from '../../application/use-cases/get-warehouse-by-id.use-case';
 import { ListWarehousesUseCase } from '../../application/use-cases/list-warehouses.use-case';
 import { SoftDeleteWarehouseUseCase } from '../../application/use-cases/soft-delete-warehouse.use-case';
 import { UpdateWarehouseUseCase } from '../../application/use-cases/update-warehouse.use-case';
-import { WarehouseAlreadyExistsError } from '../../domain/errors/warehouse-already-exists.error';
 import { CreateWarehouseRequestDto } from './dto/create-warehouse.request.dto';
 import { ListWarehousesQueryDto } from './dto/list-warehouses.query.dto';
 import {
@@ -58,24 +57,16 @@ export class WarehousesController {
   async create(
     @Body() requestDto: CreateWarehouseRequestDto,
   ): Promise<CreateWarehouseResponseDto> {
-    try {
-      const warehouse = await this.createWarehouseUseCase.execute({
-        code: requestDto.code,
-        name: requestDto.name,
-        processingTimeDays: requestDto.processingTimeDays,
-      });
+    const warehouse = await this.createWarehouseUseCase.execute({
+      code: requestDto.code,
+      name: requestDto.name,
+      processingTimeDays: requestDto.processingTimeDays,
+    });
 
-      return {
-        data: { id: warehouse.toPrimitives().id },
-        meta: this.createMeta(),
-      };
-    } catch (error) {
-      if (error instanceof WarehouseAlreadyExistsError) {
-        throw new ConflictException('Ya existe un almacén con ese código.');
-      }
-
-      throw error;
-    }
+    return {
+      data: { id: warehouse.toPrimitives().id },
+      meta: this.createMeta(),
+    };
   }
 
   @Get(':warehouseId')
@@ -93,7 +84,7 @@ export class WarehousesController {
     const warehouse = await this.getWarehouseByIdUseCase.execute(warehouseId);
 
     if (warehouse === null) {
-      throw new NotFoundException('El almacén solicitado no existe.');
+      throw this.createWarehouseNotFoundException(warehouseId);
     }
 
     return {
@@ -158,7 +149,7 @@ export class WarehousesController {
     });
 
     if (warehouse === null) {
-      throw new NotFoundException('El almacén solicitado no existe.');
+      throw this.createWarehouseNotFoundException(warehouseId);
     }
 
     return {
@@ -182,7 +173,7 @@ export class WarehousesController {
     const warehouse = await this.softDeleteWarehouseUseCase.execute(warehouseId);
 
     if (warehouse === null) {
-      throw new NotFoundException('El almacén solicitado no existe.');
+      throw this.createWarehouseNotFoundException(warehouseId);
     }
 
     return {
@@ -191,9 +182,17 @@ export class WarehousesController {
     };
   }
 
+  private createWarehouseNotFoundException(warehouseId: string): ApiHttpException {
+    return new ApiHttpException(404, {
+      code: API_ERROR_CODES.WAREHOUSE_NOT_FOUND,
+      message: 'El almacén solicitado no existe.',
+      details: [{ warehouseId }],
+    });
+  }
+
   private createMeta(): { requestId: string } {
     return {
-      requestId: `req_${randomUUID().replace(/-/g, '').slice(0, 12)}`,
+      requestId: createRequestId(),
     };
   }
 

@@ -2,11 +2,9 @@ import {
   Body,
   Controller,
   Get,
-  NotFoundException,
   Param,
   Post,
   Query,
-  UnprocessableEntityException,
 } from '@nestjs/common';
 import {
   ApiCreatedResponse,
@@ -15,7 +13,9 @@ import {
   ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger';
-import { randomUUID } from 'node:crypto';
+import { API_ERROR_CODES } from '../../../../interfaces/http/errors/api-error-codes';
+import { ApiHttpException } from '../../../../interfaces/http/errors/api-http.exception';
+import { createRequestId } from '../../../../interfaces/http/support/request-context';
 import { RegisterInventoryAdjustmentUseCase } from '../../application/use-cases/register-inventory-adjustment.use-case';
 import { GetInventoryLotByIdUseCase } from '../../application/use-cases/get-inventory-lot-by-id.use-case';
 import { GetProductInventoryAvailabilityUseCase } from '../../application/use-cases/get-product-inventory-availability.use-case';
@@ -23,11 +23,6 @@ import { GetProductInventoryLotsUseCase } from '../../application/use-cases/get-
 import { ListInventoryMovementsUseCase } from '../../application/use-cases/list-inventory-movements.use-case';
 import { RegisterInventoryEntryUseCase } from '../../application/use-cases/register-inventory-entry.use-case';
 import { RegisterInventoryExitUseCase } from '../../application/use-cases/register-inventory-exit.use-case';
-import {
-  InsufficientStockError,
-  InventoryReferenceNotFoundError,
-  UnitCostRequiredError,
-} from '../../domain/errors/inventory.errors';
 import {
   InventoryLotEnvelopeResponseDto,
   InventoryLotListResponseDto,
@@ -69,17 +64,12 @@ export class InventoryController {
   async registerEntry(
     @Body() requestDto: RegisterInventoryEntryRequestDto,
   ): Promise<InventoryMovementEnvelopeResponseDto> {
-    try {
-      const movement = await this.registerInventoryEntryUseCase.execute(requestDto);
+    const movement = await this.registerInventoryEntryUseCase.execute(requestDto);
 
-      return {
-        data: movement.toPrimitives(),
-        meta: this.createMeta(),
-      };
-    } catch (error) {
-      this.rethrowInventoryError(error);
-      throw error;
-    }
+    return {
+      data: movement.toPrimitives(),
+      meta: this.createMeta(),
+    };
   }
 
   @Post('exits')
@@ -94,17 +84,12 @@ export class InventoryController {
   async registerExit(
     @Body() requestDto: RegisterInventoryExitRequestDto,
   ): Promise<InventoryMovementEnvelopeResponseDto> {
-    try {
-      const movement = await this.registerInventoryExitUseCase.execute(requestDto);
+    const movement = await this.registerInventoryExitUseCase.execute(requestDto);
 
-      return {
-        data: movement.toPrimitives(),
-        meta: this.createMeta(),
-      };
-    } catch (error) {
-      this.rethrowInventoryError(error);
-      throw error;
-    }
+    return {
+      data: movement.toPrimitives(),
+      meta: this.createMeta(),
+    };
   }
 
   @Post('adjustments')
@@ -119,20 +104,15 @@ export class InventoryController {
   async registerAdjustment(
     @Body() requestDto: RegisterInventoryAdjustmentRequestDto,
   ): Promise<InventoryMovementEnvelopeResponseDto> {
-    try {
-      const movement = await this.registerInventoryAdjustmentUseCase.execute({
-        ...requestDto,
-        sourceReference: requestDto.sourceReference,
-      });
+    const movement = await this.registerInventoryAdjustmentUseCase.execute({
+      ...requestDto,
+      sourceReference: requestDto.sourceReference,
+    });
 
-      return {
-        data: movement.toPrimitives(),
-        meta: this.createMeta(),
-      };
-    } catch (error) {
-      this.rethrowInventoryError(error);
-      throw error;
-    }
+    return {
+      data: movement.toPrimitives(),
+      meta: this.createMeta(),
+    };
   }
 
   @Get('lots/:lotId')
@@ -150,7 +130,11 @@ export class InventoryController {
     const lot = await this.getInventoryLotByIdUseCase.execute(lotId);
 
     if (lot === null) {
-      throw new NotFoundException('El lote solicitado no existe.');
+      throw new ApiHttpException(404, {
+        code: API_ERROR_CODES.INVENTORY_LOT_NOT_FOUND,
+        message: 'El lote solicitado no existe.',
+        details: [{ lotId }],
+      });
     }
 
     return {
@@ -171,18 +155,13 @@ export class InventoryController {
   async getAvailability(
     @Param('productId') productId: string,
   ): Promise<ProductInventoryAvailabilityResponseDto> {
-    try {
-      const availability =
-        await this.getProductInventoryAvailabilityUseCase.execute(productId);
+    const availability =
+      await this.getProductInventoryAvailabilityUseCase.execute(productId);
 
-      return {
-        data: availability,
-        meta: this.createMeta(),
-      };
-    } catch (error) {
-      this.rethrowInventoryError(error);
-      throw error;
-    }
+    return {
+      data: availability,
+      meta: this.createMeta(),
+    };
   }
 
   @Get('products/:productId')
@@ -197,17 +176,12 @@ export class InventoryController {
   async getProductLots(
     @Param('productId') productId: string,
   ): Promise<InventoryLotListResponseDto> {
-    try {
-      const lots = await this.getProductInventoryLotsUseCase.execute(productId);
+    const lots = await this.getProductInventoryLotsUseCase.execute(productId);
 
-      return {
-        data: lots.map((lot) => lot.toPrimitives()),
-        meta: this.createMeta(),
-      };
-    } catch (error) {
-      this.rethrowInventoryError(error);
-      throw error;
-    }
+    return {
+      data: lots.map((lot) => lot.toPrimitives()),
+      meta: this.createMeta(),
+    };
   }
 
   @Get('movements')
@@ -246,21 +220,7 @@ export class InventoryController {
 
   private createMeta(): { requestId: string } {
     return {
-      requestId: `req_${randomUUID().replace(/-/g, '').slice(0, 12)}`,
+      requestId: createRequestId(),
     };
-  }
-
-  private rethrowInventoryError(error: unknown): never | void {
-    if (error instanceof InventoryReferenceNotFoundError) {
-      throw new NotFoundException(
-        error.resource === 'product'
-          ? 'El producto solicitado no existe.'
-          : 'El almacén solicitado no existe.',
-      );
-    }
-
-    if (error instanceof InsufficientStockError || error instanceof UnitCostRequiredError) {
-      throw new UnprocessableEntityException(error.message);
-    }
   }
 }

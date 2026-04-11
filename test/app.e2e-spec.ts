@@ -13,6 +13,25 @@ process.env.DOCS_ENABLED ??= 'true';
 const API_PREFIX = '/api/v1';
 const API_KEY_HEADER = 'api_key';
 
+function expectErrorEnvelope(
+  response: request.Response,
+  expectedStatus: number,
+  expectedCode: string,
+): void {
+  expect(response.status).toBe(expectedStatus);
+  expect(response.body).toMatchObject({
+    error: {
+      code: expectedCode,
+      message: expect.any(String),
+      details: expect.any(Array),
+    },
+    meta: {
+      requestId: expect.stringMatching(/^req_[a-f0-9]{12}$/),
+      timestamp: expect.any(String),
+    },
+  });
+}
+
 describe('AppController (e2e)', () => {
   let app: INestApplication;
 
@@ -33,15 +52,19 @@ describe('AppController (e2e)', () => {
     await app.close();
   });
 
-  it('rejects requests without api_key', () => {
-    return request(app.getHttpServer()).get(`${API_PREFIX}/health`).expect(401);
+  it('rejects requests without api_key using the uniform error contract', async () => {
+    const response = await request(app.getHttpServer()).get(`${API_PREFIX}/health`).expect(401);
+
+    expectErrorEnvelope(response, 401, 'MISSING_API_KEY');
   });
 
-  it('rejects requests with an invalid api_key', () => {
-    return request(app.getHttpServer())
+  it('rejects requests with an invalid api_key using the uniform error contract', async () => {
+    const response = await request(app.getHttpServer())
       .get(`${API_PREFIX}/health`)
       .set(API_KEY_HEADER, 'invalid-key')
       .expect(401);
+
+    expectErrorEnvelope(response, 401, 'INVALID_API_KEY');
   });
 
   it(`${API_PREFIX} (GET)`, () => {
@@ -96,6 +119,39 @@ describe('AppController (e2e)', () => {
       attributes: { color: 'White' },
       imageReferences: [],
     });
+  });
+
+  it('returns a uniform 404 error for a missing product', async () => {
+    const response = await request(app.getHttpServer())
+      .get(`${API_PREFIX}/products/prd_missing`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .expect(404);
+
+    expectErrorEnvelope(response, 404, 'PRODUCT_NOT_FOUND');
+  });
+
+  it('returns a uniform 409 error for duplicate external identifiers', async () => {
+    await request(app.getHttpServer())
+      .post(`${API_PREFIX}/products`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .send({
+        title: 'PlayStation 5',
+        brand: 'Sony',
+        externalIdentifiers: [{ type: 'asin', value: 'B0PS5-DUPLICATE' }],
+      })
+      .expect(201);
+
+    const duplicateResponse = await request(app.getHttpServer())
+      .post(`${API_PREFIX}/products`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .send({
+        title: 'PlayStation 5 Digital',
+        brand: 'Sony',
+        externalIdentifiers: [{ type: 'asin', value: 'B0PS5-DUPLICATE' }],
+      })
+      .expect(409);
+
+    expectErrorEnvelope(duplicateResponse, 409, 'PRODUCT_ALREADY_EXISTS');
   });
 
   it('lists, updates images, and soft deletes a product', async () => {
@@ -311,6 +367,41 @@ describe('AppController (e2e)', () => {
         },
       ],
     });
+  });
+
+  it('returns a uniform 422 error when there is not enough stock to consume', async () => {
+    const productResponse = await request(app.getHttpServer())
+      .post(`${API_PREFIX}/products`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .send({
+        title: 'Kindle Paperwhite',
+        brand: 'Amazon',
+        externalIdentifiers: [{ type: 'asin', value: 'B0KINDLE422' }],
+      })
+      .expect(201);
+
+    const warehouseResponse = await request(app.getHttpServer())
+      .post(`${API_PREFIX}/warehouses`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .send({
+        code: 'PUE-01',
+        name: 'Almacén Puebla',
+        processingTimeDays: 2,
+      })
+      .expect(201);
+
+    const insufficientStockResponse = await request(app.getHttpServer())
+      .post(`${API_PREFIX}/inventory/exits`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .send({
+        productId: productResponse.body.data.id,
+        warehouseId: warehouseResponse.body.data.id,
+        quantity: 1,
+        reference: { type: 'order', id: 'ORD-INSUFFICIENT' },
+      })
+      .expect(422);
+
+    expectErrorEnvelope(insufficientStockResponse, 422, 'INSUFFICIENT_STOCK');
   });
 
   it('consumes FIFO stock, lists movements, and exposes lots', async () => {

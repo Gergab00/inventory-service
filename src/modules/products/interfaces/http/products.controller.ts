@@ -1,10 +1,8 @@
 import {
   Body,
-  ConflictException,
   Controller,
   Delete,
   Get,
-  NotFoundException,
   Param,
   Post,
   Put,
@@ -17,8 +15,9 @@ import {
   ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger';
-import { randomUUID } from 'node:crypto';
-import { ProductAlreadyExistsError } from '../../domain/errors/product-already-exists.error';
+import { API_ERROR_CODES } from '../../../../interfaces/http/errors/api-error-codes';
+import { ApiHttpException } from '../../../../interfaces/http/errors/api-http.exception';
+import { createRequestId } from '../../../../interfaces/http/support/request-context';
 import { CreateProductUseCase } from '../../application/use-cases/create-product.use-case';
 import { GetProductByIdUseCase } from '../../application/use-cases/get-product-by-id.use-case';
 import { ListProductsUseCase } from '../../application/use-cases/list-products.use-case';
@@ -63,25 +62,17 @@ export class ProductsController {
   async create(
     @Body() requestDto: CreateProductRequestDto,
   ): Promise<CreateProductResponseDto> {
-    try {
-      const product = await this.createProductUseCase.execute({
-        title: requestDto.title,
-        brand: requestDto.brand,
-        externalIdentifiers: requestDto.externalIdentifiers,
-        attributes: requestDto.attributes,
-      });
+    const product = await this.createProductUseCase.execute({
+      title: requestDto.title,
+      brand: requestDto.brand,
+      externalIdentifiers: requestDto.externalIdentifiers,
+      attributes: requestDto.attributes,
+    });
 
-      return {
-        data: { id: product.toPrimitives().id },
-        meta: this.createMeta(),
-      };
-    } catch (error) {
-      if (error instanceof ProductAlreadyExistsError) {
-        throw new ConflictException('Ya existe un producto con ese identificador externo.');
-      }
-
-      throw error;
-    }
+    return {
+      data: { id: product.toPrimitives().id },
+      meta: this.createMeta(),
+    };
   }
 
   @Get(':productId')
@@ -99,7 +90,7 @@ export class ProductsController {
     const product = await this.getProductByIdUseCase.execute(productId);
 
     if (product === null) {
-      throw new NotFoundException('El producto solicitado no existe.');
+      throw this.createProductNotFoundException(productId);
     }
 
     return {
@@ -167,7 +158,7 @@ export class ProductsController {
     });
 
     if (product === null) {
-      throw new NotFoundException('El producto solicitado no existe.');
+      throw this.createProductNotFoundException(productId);
     }
 
     return {
@@ -196,7 +187,7 @@ export class ProductsController {
     });
 
     if (product === null) {
-      throw new NotFoundException('El producto solicitado no existe.');
+      throw this.createProductNotFoundException(productId);
     }
 
     return {
@@ -220,7 +211,7 @@ export class ProductsController {
     const product = await this.getProductByIdUseCase.execute(productId);
 
     if (product === null) {
-      throw new NotFoundException('El producto solicitado no existe.');
+      throw this.createProductNotFoundException(productId);
     }
 
     return {
@@ -244,7 +235,7 @@ export class ProductsController {
     const product = await this.softDeleteProductUseCase.execute(productId);
 
     if (product === null) {
-      throw new NotFoundException('El producto solicitado no existe.');
+      throw this.createProductNotFoundException(productId);
     }
 
     return {
@@ -253,9 +244,17 @@ export class ProductsController {
     };
   }
 
+  private createProductNotFoundException(productId: string): ApiHttpException {
+    return new ApiHttpException(404, {
+      code: API_ERROR_CODES.PRODUCT_NOT_FOUND,
+      message: 'El producto solicitado no existe.',
+      details: [{ productId }],
+    });
+  }
+
   private createMeta(): { requestId: string } {
     return {
-      requestId: `req_${randomUUID().replace(/-/g, '').slice(0, 12)}`,
+      requestId: createRequestId(),
     };
   }
 
