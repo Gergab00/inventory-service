@@ -1,80 +1,76 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# inventory-service
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Servicio backend construido con `NestJS + TypeScript` para gestionar productos, almacenes e inventario con trazabilidad FIFO, siguiendo principios de `Clean Architecture`.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Estado actual
 
-## Description
+- API pública versionada bajo `/api/v1`
+- Seguridad técnica por header `api_key` (el guard también acepta `x-api-key` por compatibilidad)
+- Documentación interactiva con Scalar en `/docs`
+- Especificación OpenAPI en `/openapi.json`
+- Módulos funcionales disponibles: `products`, `warehouses` e `inventory`
+- Persistencia bootstrap en memoria resuelta desde `src/infrastructure/persistence/repository.providers.ts`
 
-Servicio backend `inventory-service` construido con NestJS + TypeScript para gestionar inventario, productos y futuras integraciones, siguiendo principios de Clean Architecture.
-
-## Documentación interactiva con Scalar
-
-La aplicación expone documentación OpenAPI mediante Scalar para explorar y probar los endpoints disponibles desde una interfaz web.
-
-### Rutas disponibles
-
-- `GET /docs` — interfaz interactiva de Scalar
-- `GET /openapi.json` — especificación OpenAPI en formato JSON
-- `GET /api/v1/health` — endpoint técnico simple para validar disponibilidad
-- `GET /api/v1` — endpoint base del servicio
-
-### Configuración útil
-
-- `DOCS_ENABLED=true` — habilita o deshabilita la documentación
-- `DOCS_PATH=/docs` — ruta donde se publica Scalar
-- `OPENAPI_JSON_PATH=/openapi.json` — ruta del documento OpenAPI
-- `DATABASE_TYPE=in-memory` — modo de persistencia por defecto; deja lista la costura para futuros adapters sin activar aún una BD real
-- `MONGODB_URI` y `MONGODB_DB_NAME` — contratos de configuración reservados para el futuro adapter NoSQL
-
-### Uso local
+## Puesta en marcha local
 
 ```bash
-$ pnpm install
-$ $env:API_KEY='local-api-key'
-$ $env:DATABASE_TYPE='in-memory'
-$ pnpm start:dev
+pnpm install
+$env:API_KEY='local-api-key'
+$env:DATABASE_TYPE='in-memory'
+pnpm start:dev
 ```
 
-Luego abre `http://localhost:3000/docs` para navegar y probar la API desde Scalar.
+Puntos útiles una vez levantado el servicio:
 
-### Documentación técnica complementaria
+- `GET http://localhost:3000/api/v1`
+- `GET http://localhost:3000/api/v1/health`
+- `GET http://localhost:3000/docs`
+- `GET http://localhost:3000/openapi.json`
 
-Además de esta guía rápida, el repositorio ahora incluye documentación más detallada en:
+## Variables de entorno principales
 
-- `docs/README.md`
-- `docs/architecture/project-architecture-blueprint.md`
-- `docs/guides/como-extender-inventory-service.md`
-- `docs/adr/`
+| Variable | Requerida | Valor por defecto | Uso |
+| --- | --- | --- | --- |
+| `API_KEY` | Sí | — | Clave obligatoria para consumir la API pública |
+| `PORT` | No | `3000` | Puerto HTTP del servicio |
+| `DOCS_ENABLED` | No | `true` | Habilita o deshabilita Scalar/OpenAPI |
+| `DOCS_PATH` | No | `/docs` | Ruta donde se publica la referencia interactiva |
+| `OPENAPI_JSON_PATH` | No | `/openapi.json` | Ruta del documento OpenAPI |
+| `DATABASE_TYPE` | No | `in-memory` | Selecciona el adapter de persistencia |
+| `MONGODB_URI` | No | — | Reservada para el futuro adapter MongoDB |
+| `MONGODB_DB_NAME` | No | — | Reservada para el futuro adapter MongoDB |
 
-### Autenticación mínima por `api_key`
+> Actualmente `DATABASE_TYPE='mongodb'` forma parte del contrato de configuración, pero el adapter real todavía no está implementado y `resolvePersistenceAdapter(...)` fallará de forma explícita.
 
-Toda llamada a la API pública bajo `/api/v1/**` debe enviar el header `api_key` y su valor debe coincidir con `API_KEY` del entorno.
+## Superficie actual de la API
 
-Ejemplo:
+| Módulo | Endpoints |
+| --- | --- |
+| `system` | `GET /api/v1`, `GET /api/v1/health` |
+| `products` | `POST /api/v1/products`, `GET /api/v1/products`, `GET /api/v1/products/{productId}`, `PUT /api/v1/products/{productId}`, `PUT /api/v1/products/{productId}/images`, `GET /api/v1/products/{productId}/image-references`, `DELETE /api/v1/products/{productId}` |
+| `warehouses` | `POST /api/v1/warehouses`, `GET /api/v1/warehouses`, `GET /api/v1/warehouses/{warehouseId}`, `PUT /api/v1/warehouses/{warehouseId}`, `DELETE /api/v1/warehouses/{warehouseId}` |
+| `inventory` | `POST /api/v1/inventory/entries`, `POST /api/v1/inventory/exits`, `POST /api/v1/inventory/adjustments`, `GET /api/v1/inventory/lots/{lotId}`, `GET /api/v1/inventory/products/{productId}`, `GET /api/v1/inventory/products/{productId}/availability`, `GET /api/v1/inventory/movements` |
+
+## Contratos HTTP relevantes
+
+### Header de autenticación mínimo
 
 ```bash
 curl -H "api_key: local-api-key" http://localhost:3000/api/v1/health
 ```
 
-Si el header no está presente o no coincide, la API responde `401 Unauthorized` con un contrato uniforme:
+### Respuesta exitosa típica
+
+```json
+{
+  "data": {},
+  "meta": {
+    "requestId": "req_a1b2c3d4e5f6"
+  }
+}
+```
+
+### Error uniforme
 
 ```json
 {
@@ -85,79 +81,33 @@ Si el header no está presente o no coincide, la API responde `401 Unauthorized`
   },
   "meta": {
     "requestId": "req_a1b2c3d4e5f6",
-    "timestamp": "2026-04-10T18:30:00.000Z"
+    "timestamp": "2026-04-11T12:00:00.000Z"
   }
 }
 ```
 
-## Project setup
+Si el header existe pero no coincide con la configuración, el servicio responde `401` con el código `INVALID_API_KEY`.
 
-```bash
-$ pnpm install
-```
+## Scripts útiles
 
-## Compile and run the project
+| Comando | Propósito |
+| --- | --- |
+| `pnpm start:dev` | Arranque en desarrollo con watch |
+| `pnpm build` | Compilación de producción |
+| `pnpm lint` | Revisión de estilo con ESLint |
+| `pnpm test` | Pruebas unitarias |
+| `pnpm test:e2e` | Pruebas end-to-end |
+| `pnpm test:cov` | Cobertura |
 
-```bash
-# development
-$ pnpm run start
+## Arquitectura y documentación complementaria
 
-# watch mode
-$ pnpm run start:dev
+- `docs/README.md` — resumen técnico del estado actual
+- `docs/architecture/project-architecture-blueprint.md` — blueprint arquitectónico y diagrama
+- `docs/guides/como-extender-inventory-service.md` — guía para ampliar el servicio sin romper la arquitectura
+- `docs/adr/` — decisiones arquitectónicas registradas
 
-# production mode
-$ pnpm run start:prod
-```
+## Limitaciones conocidas
 
-## Run tests
-
-```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
-```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+- La persistencia actual sigue siendo **en memoria**
+- No existe todavía autenticación por usuarios/roles; la protección actual es técnica por `api_key`
+- Las integraciones externas reales con orquestadores y proveedor NoSQL aún están pendientes

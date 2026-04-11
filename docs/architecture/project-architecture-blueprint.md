@@ -2,7 +2,7 @@
 
 ## Resumen ejecutivo
 
-`inventory-service` es un backend en **NestJS + TypeScript** que actualmente expone una API REST pública versionada bajo `\`/api/v1\``. La implementación sigue una variante de **Clean Architecture** orientada por módulos verticales (`products`, `warehouses`, `inventory`) y usa **adaptadores en memoria** como bootstrap temporal mientras se define la persistencia NoSQL definitiva.
+`inventory-service` es un backend en **NestJS + TypeScript** que expone una API REST pública versionada bajo `/api/v1`. La implementación sigue una variante de **Clean Architecture** orientada por módulos verticales (`products`, `warehouses`, `inventory`) y hoy usa **adaptadores en memoria** como bootstrap temporal mientras se prepara la persistencia NoSQL definitiva.
 
 ## Stack y capacidades implementadas
 
@@ -10,6 +10,7 @@
 - **Lenguaje**: TypeScript estricto
 - **Documentación API**: Swagger + Scalar
 - **Validación**: `class-validator` + `ValidationPipe`
+- **Errores HTTP**: `ApiExceptionFilter` global con envelope uniforme
 - **Pruebas**: Jest + Supertest
 - **Seguridad actual**: `ApiKeyGuard` global para `api_key`
 
@@ -17,23 +18,23 @@
 
 ```mermaid
 flowchart LR
-  Client[Cliente / Orquestador] --> ApiKey[ApiKeyGuard\napi_key obligatoria]
-  ApiKey --> App[AppModule\n/api/v1]
+  Client[Cliente / Orquestador] --> Guard[ApiKeyGuard\napi_key o x-api-key]
+  Guard --> Http[setupHttpApplication\n/api/v1 + ValidationPipe + ApiExceptionFilter]
+  Http --> App[AppModule]
 
   App --> Products[ProductsModule]
   App --> Warehouses[WarehousesModule]
   App --> Inventory[InventoryModule]
 
-  Inventory --> GP[GetProductByIdUseCase]
-  Inventory --> GW[GetWarehouseByIdUseCase]
+  Products --> PR[PRODUCT_REPOSITORY]
+  Warehouses --> WR[WAREHOUSE_REPOSITORY]
+  Inventory --> IR[INVENTORY_LOT_REPOSITORY\nINVENTORY_MOVEMENT_REPOSITORY\nINVENTORY_UNIT_OF_WORK]
 
-  Products --> PR[ProductRepository]
-  Warehouses --> WR[WarehouseRepository]
-  Inventory --> IR[InventoryLotRepository\nInventoryMovementRepository]
+  PR --> Providers[repository.providers.ts\nresolvePersistenceAdapter()]
+  WR --> Providers
+  IR --> Providers
 
-  PR --> Mem[(Adaptadores en memoria)]
-  WR --> Mem
-  IR --> Mem
+  Providers --> Mem[(Adaptadores en memoria)]
 ```
 
 ## Estructura por capas
@@ -58,20 +59,32 @@ Ejemplos actuales:
 - `GetProductInventoryAvailabilityUseCase`
 
 ### 3. `infrastructure`
-Responsabilidad: adaptadores concretos. Actualmente se usan implementaciones **in-memory**.
+Responsabilidad: adaptadores concretos y bootstrap técnico. Actualmente se usan implementaciones **in-memory** y un resolver central de persistencia.
 
 Ejemplos actuales:
 - `InMemoryProductRepository`
 - `InMemoryWarehouseRepository`
 - `InMemoryInventoryRepository`
+- `src/infrastructure/persistence/repository.providers.ts`
+- `src/infrastructure/persistence/adapter.resolver.ts`
 
 ### 4. `interfaces`
-Responsabilidad: controladores HTTP, DTOs de transporte y mapeo request/response.
+Responsabilidad: controladores HTTP, DTOs de transporte, guards, filtros y mapeo request/response.
 
 Ejemplos actuales:
 - `ProductsController`
 - `WarehousesController`
 - `InventoryController`
+- `ApiKeyGuard`
+- `ApiExceptionFilter`
+
+## Bootstrap HTTP transversal
+
+La aplicación se inicializa con tres piezas principales:
+
+1. `src/main.ts` crea la app Nest y obtiene `AppConfigService`.
+2. `setupHttpApplication(...)` aplica el prefijo global `/api/v1`, el `ValidationPipe` y el `ApiExceptionFilter`.
+3. `setupApiDocumentation(...)` publica Scalar en `/docs` y OpenAPI en `/openapi.json`.
 
 ## Módulos implementados
 
@@ -141,13 +154,13 @@ Modela el inventario como **movimientos + lotes FIFO**, no como un número mutab
 
 ## Flujo HTTP transversal
 
-1. El request entra por `\`/api/v1/**\``.
-2. `ApiKeyGuard` valida el header `\`api_key\``.
+1. El request entra por `/api/v1/**`.
+2. `ApiKeyGuard` valida el header `api_key` (o `x-api-key`).
 3. `ValidationPipe` transforma y valida DTOs.
 4. El controller permanece delgado y delega a un caso de uso.
 5. El caso de uso coordina entidades y puertos.
-6. El adaptador concreto persiste/recupera el estado.
-7. La respuesta vuelve en envelope `\`data\`` + `\`meta\``.
+6. `repository.providers.ts` resuelve el adapter concreto según `DATABASE_TYPE`.
+7. Las respuestas exitosas vuelven como `data + meta.requestId` y los errores se normalizan mediante `ApiExceptionFilter`.
 
 ## Decisiones relevantes vigentes
 
@@ -179,10 +192,10 @@ Si el endpoint es de dominio:
 
 ## Riesgos y pendientes
 
-- Falta persistencia real NoSQL.
-- Aún no existe filtro global uniforme para mapear todos los errores de dominio.
+- Falta implementar el adapter real para `DATABASE_TYPE='mongodb'`; hoy `resolvePersistenceAdapter(...)` lanza un error explícito en ese modo.
 - No hay autenticación de usuario/rol; solo protección técnica por header.
 - La integración con orquestadores todavía no está implementada como adaptador real.
+- A medida que crezca la API habrá que ampliar el catálogo de códigos y ejemplos del filtro global de errores.
 
 ## Señales de que la arquitectura se mantiene sana
 

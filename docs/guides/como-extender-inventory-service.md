@@ -46,10 +46,10 @@ src/modules/<modulo>/
 ### Ejemplo de checklist
 
 - [ ] ¿El endpoint representa un recurso o una acción de negocio?
-- [ ] ¿La ruta queda bajo `\`/api/v1\``?
+- [ ] ¿La ruta queda bajo `/api/v1`?
 - [ ] ¿El request usa DTO validado?
 - [ ] ¿El controller solo delega?
-- [ ] ¿La respuesta usa envelope `\`data\`` + `\`meta\``?
+- [ ] ¿La respuesta usa envelope `data + meta`?
 - [ ] ¿Se agregó documentación OpenAPI?
 - [ ] ¿Se añadieron pruebas?
 
@@ -91,17 +91,33 @@ Separar:
 - entidad de dominio,
 - DTO de respuesta.
 
-### Paso 4 — Cambiar el provider del módulo
-Reemplazar:
+### Paso 4 — Extender el resolver central de persistencia
+Hoy el wiring no vive dentro de cada controller o caso de uso, sino en:
+
+- `src/infrastructure/persistence/repository.providers.ts`
+- `src/infrastructure/persistence/adapter.resolver.ts`
+
+El patrón actual toma `DATABASE_TYPE` y resuelve el adapter concreto por provider/factory. El punto de extensión correcto es ese resolver, no el dominio.
+
+Ejemplo base actual:
 
 ```ts
 {
   provide: PRODUCT_REPOSITORY,
-  useExisting: InMemoryProductRepository,
+  inject: [ConfigService, InMemoryProductRepository],
+  useFactory: (
+    configService: ConfigService<EnvironmentVariables, true>,
+    inMemoryProductRepository: InMemoryProductRepository,
+  ): ProductRepository =>
+    resolvePersistenceAdapter({
+      adapterName: 'ProductRepository',
+      databaseType: getDatabaseType(configService),
+      inMemoryAdapter: inMemoryProductRepository,
+    }),
 }
 ```
 
-por la implementación real de Mongo/NoSQL.
+Cuando exista el adapter Mongo/NoSQL real, se debe ampliar `resolvePersistenceAdapter(...)` para retornarlo cuando `DATABASE_TYPE === 'mongodb'`, sin tocar casos de uso ni controladores.
 
 ---
 
@@ -157,6 +173,7 @@ docs/adr/
 
 Antes de considerar terminado un cambio:
 
+- [ ] `pnpm lint`
 - [ ] `pnpm test -- --runInBand`
 - [ ] `pnpm test:e2e`
 - [ ] `pnpm build`
@@ -168,8 +185,8 @@ Antes de considerar terminado un cambio:
 
 ## 8. Próximas expansiones sugeridas
 
-1. Persistencia NoSQL real.
-2. Filtro global de errores para mapear mejor `404`, `409` y `422`.
-3. Consultas de auditoría más ricas sobre movimientos y capas FIFO.
+1. Persistencia NoSQL real detrás de `resolvePersistenceAdapter(...)`.
+2. Consultas de auditoría más ricas sobre movimientos y capas FIFO.
+3. Observabilidad: métricas, logging estructurado y trazabilidad por request.
 4. Integración real con orquestadores de imágenes.
-5. Métricas, logging estructurado y observabilidad.
+5. Autenticación/autorización más allá de la `api_key` técnica.
