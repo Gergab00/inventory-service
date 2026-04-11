@@ -7,6 +7,7 @@ import { AppConfigService } from './infrastructure/config/app-config.service';
 import { validateEnvironment } from './infrastructure/config/env.validation';
 import { ApiKeyGuard } from './interfaces/http/guards/api-key.guard';
 import { ProductsModule } from './modules/products/products.module';
+import { WarehousesModule } from './modules/warehouses/warehouses.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { ProductsModule } from './modules/products/products.module';
       validate: validateEnvironment,
     }),
     ProductsModule,
+    WarehousesModule,
   ],
   controllers: [AppController],
   providers: [

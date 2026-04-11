@@ -172,6 +172,90 @@ describe('AppController (e2e)', () => {
     });
   });
 
+  it('creates and retrieves a warehouse', async () => {
+    const createResponse = await request(app.getHttpServer())
+      .post(`${API_PREFIX}/warehouses`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .send({
+        code: 'CDMX-01',
+        name: 'Almacén CDMX',
+        processingTimeDays: 1,
+      })
+      .expect(201);
+
+    expect(createResponse.body.data.id).toMatch(/^wh_/);
+    expect(createResponse.body.meta.requestId).toEqual(expect.any(String));
+
+    const warehouseId = createResponse.body.data.id as string;
+
+    const getResponse = await request(app.getHttpServer())
+      .get(`${API_PREFIX}/warehouses/${warehouseId}`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .expect(200);
+
+    expect(getResponse.body.data).toMatchObject({
+      id: warehouseId,
+      code: 'CDMX-01',
+      name: 'Almacén CDMX',
+      status: 'active',
+      processingTimeDays: 1,
+    });
+  });
+
+  it('lists, updates, and soft deletes a warehouse', async () => {
+    const createResponse = await request(app.getHttpServer())
+      .post(`${API_PREFIX}/warehouses`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .send({
+        code: 'MTY-01',
+        name: 'Almacén Monterrey',
+        processingTimeDays: 2,
+      })
+      .expect(201);
+
+    const warehouseId = createResponse.body.data.id as string;
+
+    const listResponse = await request(app.getHttpServer())
+      .get(`${API_PREFIX}/warehouses?page=1&pageSize=20&name=monterrey`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .expect(200);
+
+    expect(listResponse.body.data).toHaveLength(1);
+    expect(listResponse.body.meta.pagination).toMatchObject({
+      page: 1,
+      pageSize: 20,
+      total: 1,
+      totalPages: 1,
+    });
+
+    const updateResponse = await request(app.getHttpServer())
+      .put(`${API_PREFIX}/warehouses/${warehouseId}`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .send({
+        name: 'Almacén Monterrey Norte',
+        processingTimeDays: 3,
+      })
+      .expect(200);
+
+    expect(updateResponse.body.data).toMatchObject({
+      id: warehouseId,
+      code: 'MTY-01',
+      name: 'Almacén Monterrey Norte',
+      processingTimeDays: 3,
+      status: 'active',
+    });
+
+    const deleteResponse = await request(app.getHttpServer())
+      .delete(`${API_PREFIX}/warehouses/${warehouseId}`)
+      .set(API_KEY_HEADER, process.env.API_KEY as string)
+      .expect(200);
+
+    expect(deleteResponse.body.data).toMatchObject({
+      id: warehouseId,
+      status: 'inactive',
+    });
+  });
+
   it('/docs (GET)', async () => {
     const response = await request(app.getHttpServer()).get('/docs').expect(200);
 
