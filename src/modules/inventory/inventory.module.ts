@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { inventoryPersistenceProviders } from '../../infrastructure/persistence/repository.providers';
 import { ProductsModule } from '../products/products.module';
 import { WarehousesModule } from '../warehouses/warehouses.module';
 import { GetInventoryLotByIdUseCase } from './application/use-cases/get-inventory-lot-by-id.use-case';
@@ -8,11 +9,6 @@ import { ListInventoryMovementsUseCase } from './application/use-cases/list-inve
 import { RegisterInventoryAdjustmentUseCase } from './application/use-cases/register-inventory-adjustment.use-case';
 import { RegisterInventoryEntryUseCase } from './application/use-cases/register-inventory-entry.use-case';
 import { RegisterInventoryExitUseCase } from './application/use-cases/register-inventory-exit.use-case';
-import {
-  INVENTORY_LOT_REPOSITORY,
-  INVENTORY_MOVEMENT_REPOSITORY,
-} from './domain/ports/inventory.repository.port';
-import { InMemoryInventoryRepository } from './infrastructure/repositories/in-memory-inventory.repository';
 import { InventoryController } from './interfaces/http/inventory.controller';
 
 @Module({
@@ -26,15 +22,7 @@ import { InventoryController } from './interfaces/http/inventory.controller';
     GetProductInventoryLotsUseCase,
     GetProductInventoryAvailabilityUseCase,
     ListInventoryMovementsUseCase,
-    InMemoryInventoryRepository,
-    {
-      provide: INVENTORY_LOT_REPOSITORY,
-      useExisting: InMemoryInventoryRepository,
-    },
-    {
-      provide: INVENTORY_MOVEMENT_REPOSITORY,
-      useExisting: InMemoryInventoryRepository,
-    },
+    ...inventoryPersistenceProviders,
   ],
 })
 export class InventoryModule {}

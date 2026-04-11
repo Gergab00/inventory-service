@@ -18,6 +18,8 @@ import type {
   InventoryMovementRepository,
 } from '../../domain/ports/inventory.repository.port';
 import { RegisterInventoryAdjustmentCommand } from '../commands/register-inventory-adjustment.command';
+import { INVENTORY_UNIT_OF_WORK } from '../ports/inventory-unit-of-work.port';
+import type { InventoryUnitOfWork } from '../ports/inventory-unit-of-work.port';
 
 @Injectable()
 export class RegisterInventoryAdjustmentUseCase {
@@ -26,6 +28,8 @@ export class RegisterInventoryAdjustmentUseCase {
     private readonly inventoryLotRepository: InventoryLotRepository,
     @Inject(INVENTORY_MOVEMENT_REPOSITORY)
     private readonly inventoryMovementRepository: InventoryMovementRepository,
+    @Inject(INVENTORY_UNIT_OF_WORK)
+    private readonly inventoryUnitOfWork: InventoryUnitOfWork,
     private readonly getProductByIdUseCase: GetProductByIdUseCase,
     private readonly getWarehouseByIdUseCase: GetWarehouseByIdUseCase,
   ) {}
@@ -33,23 +37,54 @@ export class RegisterInventoryAdjustmentUseCase {
   async execute(
     command: RegisterInventoryAdjustmentCommand,
   ): Promise<InventoryMovement> {
-    await this.ensureReferencesExist(command.productId, command.warehouseId);
+    return this.inventoryUnitOfWork.run(async () => {
+      await this.ensureReferencesExist(command.productId, command.warehouseId);
 
-    if (command.quantity > 0) {
-      if (command.unitCost === undefined || command.sourceReference === undefined) {
-        throw new UnitCostRequiredError();
+      if (command.quantity > 0) {
+        if (command.unitCost === undefined || command.sourceReference === undefined) {
+          throw new UnitCostRequiredError();
+        }
+
+        const lot = InventoryLot.create({
+          lotId: createLotId(),
+          productId: command.productId,
+          warehouseId: command.warehouseId,
+          quantity: command.quantity,
+          unitCost: command.unitCost,
+          sourceReference: command.sourceReference,
+        });
+
+        await this.inventoryLotRepository.save(lot);
+
+        const movement = InventoryMovement.create({
+          movementId: createMovementId(),
+          type: 'adjustment',
+          productId: command.productId,
+          warehouseId: command.warehouseId,
+          quantity: command.quantity,
+          unitCost: command.unitCost,
+          sourceReference: command.sourceReference,
+          reference: { type: 'adjustment-reason', id: command.reason },
+          affectedLotIds: [lot.toPrimitives().lotId],
+        });
+
+        await this.inventoryMovementRepository.save(movement);
+        return movement;
       }
 
-      const lot = InventoryLot.create({
-        lotId: createLotId(),
-        productId: command.productId,
-        warehouseId: command.warehouseId,
-        quantity: command.quantity,
-        unitCost: command.unitCost,
-        sourceReference: command.sourceReference,
-      });
+      const lots = await this.inventoryLotRepository.findAvailableByProductAndWarehouse(
+        command.productId,
+        command.warehouseId,
+      );
 
-      await this.inventoryLotRepository.save(lot);
+      const affectedLotIds = new FifoConsumptionService().consume(
+        lots,
+        Math.abs(command.quantity),
+        command.productId,
+        command.warehouseId,
+      );
+
+      await Promise.all(lots.map((lot) => this.inventoryLotRepository.save(lot)));
 
       const movement = InventoryMovement.create({
         movementId: createMovementId(),
@@ -57,42 +92,13 @@ export class RegisterInventoryAdjustmentUseCase {
         productId: command.productId,
         warehouseId: command.warehouseId,
         quantity: command.quantity,
-        unitCost: command.unitCost,
-        sourceReference: command.sourceReference,
         reference: { type: 'adjustment-reason', id: command.reason },
-        affectedLotIds: [lot.toPrimitives().lotId],
+        affectedLotIds,
       });
 
       await this.inventoryMovementRepository.save(movement);
       return movement;
-    }
-
-    const lots = await this.inventoryLotRepository.findAvailableByProductAndWarehouse(
-      command.productId,
-      command.warehouseId,
-    );
-
-    const affectedLotIds = new FifoConsumptionService().consume(
-      lots,
-      Math.abs(command.quantity),
-      command.productId,
-      command.warehouseId,
-    );
-
-    await Promise.all(lots.map((lot) => this.inventoryLotRepository.save(lot)));
-
-    const movement = InventoryMovement.create({
-      movementId: createMovementId(),
-      type: 'adjustment',
-      productId: command.productId,
-      warehouseId: command.warehouseId,
-      quantity: command.quantity,
-      reference: { type: 'adjustment-reason', id: command.reason },
-      affectedLotIds,
     });
-
-    await this.inventoryMovementRepository.save(movement);
-    return movement;
   }
 
   private async ensureReferencesExist(

@@ -1,10 +1,16 @@
-import { EnvironmentVariables, NodeEnvironment } from './environment-variables';
+import {
+  DatabaseType,
+  EnvironmentVariables,
+  NodeEnvironment,
+} from './environment-variables';
 
 const ALLOWED_NODE_ENVIRONMENTS: readonly NodeEnvironment[] = [
   'development',
   'test',
   'production',
 ];
+
+const ALLOWED_DATABASE_TYPES: readonly DatabaseType[] = ['in-memory', 'mongodb'];
 
 function parsePort(value: unknown): number {
   const port = Number(value);
@@ -77,6 +83,35 @@ function parseRoutePath(
   return resolvedPath;
 }
 
+function parseDatabaseType(value: unknown): DatabaseType {
+  const databaseType =
+    typeof value === 'string' && value.trim().length > 0
+      ? value.trim()
+      : 'in-memory';
+
+  if (!ALLOWED_DATABASE_TYPES.includes(databaseType as DatabaseType)) {
+    throw new Error(
+      `Environment variable DATABASE_TYPE must be one of: ${ALLOWED_DATABASE_TYPES.join(', ')}.`,
+    );
+  }
+
+  return databaseType as DatabaseType;
+}
+
+function parseOptionalString(value: unknown, variableName: string): string | undefined {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+
+  if (typeof value !== 'string') {
+    throw new Error(`Environment variable ${variableName} must be a string value.`);
+  }
+
+  const normalizedValue = value.trim();
+
+  return normalizedValue.length > 0 ? normalizedValue : undefined;
+}
+
 export function validateEnvironment(
   config: Record<string, unknown>,
 ): EnvironmentVariables {
@@ -98,6 +133,12 @@ export function validateEnvironment(
       config.OPENAPI_JSON_PATH,
       'OPENAPI_JSON_PATH',
       '/openapi.json',
+    ),
+    DATABASE_TYPE: parseDatabaseType(config.DATABASE_TYPE),
+    MONGODB_URI: parseOptionalString(config.MONGODB_URI, 'MONGODB_URI'),
+    MONGODB_DB_NAME: parseOptionalString(
+      config.MONGODB_DB_NAME,
+      'MONGODB_DB_NAME',
     ),
   };
 }

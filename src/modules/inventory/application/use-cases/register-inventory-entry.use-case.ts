@@ -14,6 +14,8 @@ import type {
   InventoryMovementRepository,
 } from '../../domain/ports/inventory.repository.port';
 import { RegisterInventoryEntryCommand } from '../commands/register-inventory-entry.command';
+import { INVENTORY_UNIT_OF_WORK } from '../ports/inventory-unit-of-work.port';
+import type { InventoryUnitOfWork } from '../ports/inventory-unit-of-work.port';
 
 @Injectable()
 export class RegisterInventoryEntryUseCase {
@@ -22,37 +24,41 @@ export class RegisterInventoryEntryUseCase {
     private readonly inventoryLotRepository: InventoryLotRepository,
     @Inject(INVENTORY_MOVEMENT_REPOSITORY)
     private readonly inventoryMovementRepository: InventoryMovementRepository,
+    @Inject(INVENTORY_UNIT_OF_WORK)
+    private readonly inventoryUnitOfWork: InventoryUnitOfWork,
     private readonly getProductByIdUseCase: GetProductByIdUseCase,
     private readonly getWarehouseByIdUseCase: GetWarehouseByIdUseCase,
   ) {}
 
   async execute(command: RegisterInventoryEntryCommand): Promise<InventoryMovement> {
-    await this.ensureReferencesExist(command.productId, command.warehouseId);
+    return this.inventoryUnitOfWork.run(async () => {
+      await this.ensureReferencesExist(command.productId, command.warehouseId);
 
-    const lot = InventoryLot.create({
-      lotId: createLotId(),
-      productId: command.productId,
-      warehouseId: command.warehouseId,
-      quantity: command.quantity,
-      unitCost: command.unitCost,
-      sourceReference: command.sourceReference,
+      const lot = InventoryLot.create({
+        lotId: createLotId(),
+        productId: command.productId,
+        warehouseId: command.warehouseId,
+        quantity: command.quantity,
+        unitCost: command.unitCost,
+        sourceReference: command.sourceReference,
+      });
+
+      const movement = InventoryMovement.create({
+        movementId: createMovementId(),
+        type: 'entry',
+        productId: command.productId,
+        warehouseId: command.warehouseId,
+        quantity: command.quantity,
+        unitCost: command.unitCost,
+        sourceReference: command.sourceReference,
+        affectedLotIds: [lot.toPrimitives().lotId],
+      });
+
+      await this.inventoryLotRepository.save(lot);
+      await this.inventoryMovementRepository.save(movement);
+
+      return movement;
     });
-
-    const movement = InventoryMovement.create({
-      movementId: createMovementId(),
-      type: 'entry',
-      productId: command.productId,
-      warehouseId: command.warehouseId,
-      quantity: command.quantity,
-      unitCost: command.unitCost,
-      sourceReference: command.sourceReference,
-      affectedLotIds: [lot.toPrimitives().lotId],
-    });
-
-    await this.inventoryLotRepository.save(lot);
-    await this.inventoryMovementRepository.save(movement);
-
-    return movement;
   }
 
   private async ensureReferencesExist(

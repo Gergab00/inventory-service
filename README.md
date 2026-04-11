@@ -41,12 +41,15 @@ La aplicación expone documentación OpenAPI mediante Scalar para explorar y pro
 - `DOCS_ENABLED=true` — habilita o deshabilita la documentación
 - `DOCS_PATH=/docs` — ruta donde se publica Scalar
 - `OPENAPI_JSON_PATH=/openapi.json` — ruta del documento OpenAPI
+- `DATABASE_TYPE=in-memory` — modo de persistencia por defecto; deja lista la costura para futuros adapters sin activar aún una BD real
+- `MONGODB_URI` y `MONGODB_DB_NAME` — contratos de configuración reservados para el futuro adapter NoSQL
 
 ### Uso local
 
 ```bash
 $ pnpm install
 $ $env:API_KEY='local-api-key'
+$ $env:DATABASE_TYPE='in-memory'
 $ pnpm start:dev
 ```
 
@@ -71,7 +74,21 @@ Ejemplo:
 curl -H "api_key: local-api-key" http://localhost:3000/api/v1/health
 ```
 
-Si el header no está presente o no coincide, la API responde `401 Unauthorized`.
+Si el header no está presente o no coincide, la API responde `401 Unauthorized` con un contrato uniforme:
+
+```json
+{
+  "error": {
+    "code": "MISSING_API_KEY",
+    "message": "El header api_key es obligatorio para consumir la API pública.",
+    "details": []
+  },
+  "meta": {
+    "requestId": "req_a1b2c3d4e5f6",
+    "timestamp": "2026-04-10T18:30:00.000Z"
+  }
+}
+```
 
 ## Project setup
 

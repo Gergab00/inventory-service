@@ -11,6 +11,7 @@ Al día **2026-04-10**, el servicio ya cuenta con una primera implementación p�
 - **Módulo `warehouses`**: creación, consulta, listado, actualización y soft delete.
 - **Módulo `inventory`**: entradas, salidas FIFO, ajustes, consulta de disponibilidad, lotes y movimientos.
 - **Documentación interactiva**: `\`/docs\`` y `\`/openapi.json\``.
+- **Contratos de error uniformes**: `401`, `404`, `409` y `422` responden con envelope estable `error + meta` y códigos transportables.
 
 ## Cambios realizados
 
@@ -29,6 +30,15 @@ Al día **2026-04-10**, el servicio ya cuenta con una primera implementación p�
 ### Entrega 4 — Primera vertical de `inventory`
 - `feat(inventory): implementar primera vertical REST con FIFO`
 - Se implementó inventario como **movimientos + lotes FIFO** con trazabilidad y consultas derivadas de disponibilidad.
+
+### Entrega 5 — Contratos uniformes de error HTTP
+- Se agregó un filtro global de NestJS para responder `401`, `404`, `409` y `422` con un contrato estable y machine-readable.
+- El mapeo de errores salió de los controladores y ahora se centraliza en una única capa transversal.
+
+### Entrega 6 — Preparación de puertos para adapters de persistencia
+- Se desacopló el wiring de los módulos respecto a `InMemory*Repository` mediante providers/factories de infraestructura.
+- Se añadió `DATABASE_TYPE=in-memory` como modo por defecto y se dejó preparada la costura para conectar un adapter real después sin tocar casos de uso ni controladores.
+- `inventory` ahora cuenta además con un `UnitOfWork` no-op para facilitar futuras transacciones de persistencia.
 
 ## Documentos disponibles
 
@@ -51,11 +61,11 @@ Al día **2026-04-10**, el servicio ya cuenta con una primera implementación p�
 - La persistencia sigue siendo **en memoria**; todavía no existe un adaptador NoSQL real.
 - La autenticación actual es técnica y mínima (`api_key`), no un esquema completo de usuarios/roles.
 - Aún faltan integraciones externas reales con orquestadores o proveedores.
-- La normalización avanzada de errores HTTP todavía puede endurecerse con filtros globales dedicados.
+- La API ya normaliza `401`, `404`, `409` y `422` con un envelope uniforme, pero futuras iteraciones pueden ampliar ejemplos OpenAPI y códigos de error adicionales para nuevos módulos.
 
 ## Prioridades sugeridas para la siguiente expansión
 
 1. Sustituir los repositorios en memoria por adaptadores NoSQL reales.
-2. Unificar respuestas de error con filtros y códigos de dominio consistentes.
+2. Expandir el catálogo de códigos y ejemplos OpenAPI conforme crezcan los módulos.
 3. Expandir `inventory` con valuación, auditoría extendida y consultas por almacén.
 4. Integrar el flujo real de imágenes/orquestación sobre puertos y anti-corruption layers.

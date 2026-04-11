@@ -14,6 +14,8 @@ import type {
   InventoryMovementRepository,
 } from '../../domain/ports/inventory.repository.port';
 import { RegisterInventoryExitCommand } from '../commands/register-inventory-exit.command';
+import { INVENTORY_UNIT_OF_WORK } from '../ports/inventory-unit-of-work.port';
+import type { InventoryUnitOfWork } from '../ports/inventory-unit-of-work.port';
 
 @Injectable()
 export class RegisterInventoryExitUseCase {
@@ -22,40 +24,44 @@ export class RegisterInventoryExitUseCase {
     private readonly inventoryLotRepository: InventoryLotRepository,
     @Inject(INVENTORY_MOVEMENT_REPOSITORY)
     private readonly inventoryMovementRepository: InventoryMovementRepository,
+    @Inject(INVENTORY_UNIT_OF_WORK)
+    private readonly inventoryUnitOfWork: InventoryUnitOfWork,
     private readonly getProductByIdUseCase: GetProductByIdUseCase,
     private readonly getWarehouseByIdUseCase: GetWarehouseByIdUseCase,
   ) {}
 
   async execute(command: RegisterInventoryExitCommand): Promise<InventoryMovement> {
-    await this.ensureReferencesExist(command.productId, command.warehouseId);
+    return this.inventoryUnitOfWork.run(async () => {
+      await this.ensureReferencesExist(command.productId, command.warehouseId);
 
-    const lots = await this.inventoryLotRepository.findAvailableByProductAndWarehouse(
-      command.productId,
-      command.warehouseId,
-    );
+      const lots = await this.inventoryLotRepository.findAvailableByProductAndWarehouse(
+        command.productId,
+        command.warehouseId,
+      );
 
-    const affectedLotIds = new FifoConsumptionService().consume(
-      lots,
-      command.quantity,
-      command.productId,
-      command.warehouseId,
-    );
+      const affectedLotIds = new FifoConsumptionService().consume(
+        lots,
+        command.quantity,
+        command.productId,
+        command.warehouseId,
+      );
 
-    await Promise.all(lots.map((lot) => this.inventoryLotRepository.save(lot)));
+      await Promise.all(lots.map((lot) => this.inventoryLotRepository.save(lot)));
 
-    const movement = InventoryMovement.create({
-      movementId: createMovementId(),
-      type: 'exit',
-      productId: command.productId,
-      warehouseId: command.warehouseId,
-      quantity: command.quantity,
-      reference: command.reference,
-      affectedLotIds,
+      const movement = InventoryMovement.create({
+        movementId: createMovementId(),
+        type: 'exit',
+        productId: command.productId,
+        warehouseId: command.warehouseId,
+        quantity: command.quantity,
+        reference: command.reference,
+        affectedLotIds,
+      });
+
+      await this.inventoryMovementRepository.save(movement);
+
+      return movement;
     });
-
-    await this.inventoryMovementRepository.save(movement);
-
-    return movement;
   }
 
   private async ensureReferencesExist(

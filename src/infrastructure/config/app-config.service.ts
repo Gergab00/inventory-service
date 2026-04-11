@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { EnvironmentVariables, NodeEnvironment } from './environment-variables';
+import {
+  DatabaseType,
+  EnvironmentVariables,
+  NodeEnvironment,
+} from './environment-variables';
 
 @Injectable()
 export class AppConfigService {
@@ -30,6 +34,18 @@ export class AppConfigService {
 
   get openApiJsonPath(): string {
     return this.configService.getOrThrow<string>('OPENAPI_JSON_PATH');
+  }
+
+  get databaseType(): DatabaseType {
+    return this.configService.getOrThrow<DatabaseType>('DATABASE_TYPE');
+  }
+
+  get mongodbUri(): string | undefined {
+    return this.configService.get<string>('MONGODB_URI');
+  }
+
+  get mongodbDbName(): string | undefined {
+    return this.configService.get<string>('MONGODB_DB_NAME');
   }
 
   get isProduction(): boolean {
