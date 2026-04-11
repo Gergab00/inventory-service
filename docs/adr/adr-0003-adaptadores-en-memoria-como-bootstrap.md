@@ -1,18 +1,18 @@
 ---
 title: "ADR-0003: Usar adaptadores en memoria como bootstrap temporal"
-status: "Accepted"
+status: "Superseded"
 date: "2026-04-10"
 authors: "Equipo de inventory-service"
 tags: ["architecture", "bootstrap", "persistence"]
 supersedes: ""
-superseded_by: ""
+superseded_by: "adr-0004-mongodb-nativo-con-transacciones"
 ---
 
 # ADR-0003: Usar adaptadores en memoria como bootstrap temporal
 
 ## Status
 
-**Accepted**
+**Superseded** — Ver [ADR-0004](./adr-0004-mongodb-nativo-con-transacciones.md) que implementa la persistencia real.
 
 ## Context
 

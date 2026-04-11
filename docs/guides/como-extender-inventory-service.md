@@ -65,9 +65,9 @@ Ejemplo incorrecto:
 
 ---
 
-## 3. Cómo reemplazar los repositorios en memoria por NoSQL
+## 3. Cómo usar y extender la persistencia MongoDB
 
-Actualmente `products`, `warehouses` e `inventory` usan adaptadores en memoria. Para migrarlos a NoSQL:
+Actualmente el servicio soporta `DATABASE_TYPE='in-memory'` y `DATABASE_TYPE='mongodb'`. El wiring selecciona el adapter concreto de forma centralizada.
 
 ### Paso 1 — Mantener los puertos
 No cambiar las interfaces públicas de:
@@ -76,13 +76,15 @@ No cambiar las interfaces públicas de:
 - `InventoryLotRepository`
 - `InventoryMovementRepository`
 
-### Paso 2 — Crear implementaciones concretas
-Ejemplo sugerido:
+### Paso 2 — Implementaciones concretas ya disponibles
+
+Implementaciones actuales:
 
 ```text
 src/modules/products/infrastructure/repositories/mongo-product.repository.ts
 src/modules/warehouses/infrastructure/repositories/mongo-warehouse.repository.ts
 src/modules/inventory/infrastructure/repositories/mongo-inventory.repository.ts
+src/modules/inventory/infrastructure/unit-of-work/mongo-inventory-unit-of-work.ts
 ```
 
 ### Paso 3 — Agregar mappers explícitos
@@ -117,7 +119,7 @@ Ejemplo base actual:
 }
 ```
 
-Cuando exista el adapter Mongo/NoSQL real, se debe ampliar `resolvePersistenceAdapter(...)` para retornarlo cuando `DATABASE_TYPE === 'mongodb'`, sin tocar casos de uso ni controladores.
+El resolver ya soporta `mongodb` y selecciona repositorios/UoW concretos sin tocar casos de uso ni controladores.
 
 ---
 

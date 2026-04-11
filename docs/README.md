@@ -2,7 +2,7 @@
 
 ## Estado actual
 
-`inventory-service` ya expone una API REST pública y verificable bajo `/api/v1`. Este resumen está alineado con el bootstrap HTTP actual (`src/main.ts`, `src/infrastructure/config/http-application.setup.ts`) y con la capa de persistencia centralizada en `src/infrastructure/persistence/repository.providers.ts`.
+`inventory-service` expone una API REST pública y verificable bajo `/api/v1`. Este resumen está alineado con el bootstrap HTTP (`src/main.ts`, `src/infrastructure/config/http-application.setup.ts`) y con la capa de persistencia centralizada en `src/infrastructure/persistence/repository.providers.ts`.
 
 ### Capacidades disponibles
 
@@ -12,7 +12,7 @@
 - **Módulo `inventory`**: entradas, salidas FIFO, ajustes, consulta de disponibilidad, lotes y movimientos.
 - **Documentación interactiva**: `/docs` y `/openapi.json`.
 - **Contratos HTTP uniformes**: respuestas exitosas con `data + meta.requestId` y errores con envelope estable `error + meta`.
-- **Selección de persistencia preparada**: `DATABASE_TYPE` gobierna el adapter activo mediante `resolvePersistenceAdapter(...)`; hoy el modo operativo es `in-memory`.
+- **Persistencia seleccionable y operativa**: `DATABASE_TYPE` gobierna el adapter activo; tanto `in-memory` como `mongodb` están completamente implementados y listos para producción.
 
 ## Evolución ya incorporada
 
@@ -41,13 +41,26 @@
 - `DATABASE_TYPE=in-memory` activa el adapter bootstrap actual y deja preparada la costura para conectar un adapter real después sin tocar casos de uso ni controladores.
 - `inventory` cuenta además con un `UnitOfWork` no-op para facilitar futuras transacciones de persistencia.
 
+### Entrega 7 — Adapter real de MongoDB (driver nativo)
+- `feat(persistence): implementar adapter real de MongoDB con transacciones`
+- Se implementaron adaptadores concretos de MongoDB para los tres módulos usando el **driver nativo** (`mongodb@7.1.1`), sin ODM.
+- Se introdujo `MongoPersistenceModule` (`@Global`) que gestiona el ciclo de vida de `MongoClient`, crea índices de soporte y propaga la sesión transaccional vía `AsyncLocalStorage`.
+- `MongoInventoryUnitOfWork` implementa transacciones reales con `withSession + withTransaction`, sin modificar los puertos de dominio/aplicación.
+- Los tres módulos cuentan ahora con implementaciones concretas para `DATABASE_TYPE='mongodb'`:
+  - `MongoProductRepository`
+  - `MongoWarehouseRepository`
+  - `MongoInventoryRepository`
+  - `MongoInventoryUnitOfWork`
+- La validación de entorno fue robustificada: `MONGODB_URI` y `MONGODB_DB_NAME` son obligatorias cuando `DATABASE_TYPE='mongodb'`.
+
 ## Documentos disponibles
 
 - [`docs/architecture/project-architecture-blueprint.md`](./architecture/project-architecture-blueprint.md) — visión arquitectónica actual, diagrama y límites entre módulos.
 - [`docs/guides/como-extender-inventory-service.md`](./guides/como-extender-inventory-service.md) — guía práctica para seguir expandiendo el servicio.
 - [`docs/adr/adr-0001-versionado-y-api-key.md`](./adr/adr-0001-versionado-y-api-key.md) — decisión de versionado y protección por `api_key`.
 - [`docs/adr/adr-0002-inventario-como-movimientos-fifo.md`](./adr/adr-0002-inventario-como-movimientos-fifo.md) — decisión de modelar inventario con movimientos y FIFO.
-- [`docs/adr/adr-0003-adaptadores-en-memoria-como-bootstrap.md`](./adr/adr-0003-adaptadores-en-memoria-como-bootstrap.md) — decisión temporal de usar repositorios en memoria para arrancar.
+- [`docs/adr/adr-0003-adaptadores-en-memoria-como-bootstrap.md`](./adr/adr-0003-adaptadores-en-memoria-como-bootstrap.md) — decisión temporal de usar repositorios en memoria para arrancar (**supersedida** por ADR-0004).
+- [`docs/adr/adr-0004-mongodb-nativo-con-transacciones.md`](./adr/adr-0004-mongodb-nativo-con-transacciones.md) — decisión de usar el driver nativo de MongoDB con transacciones reales y `AsyncLocalStorage`.
 
 ## Superficie actual de la API
 
@@ -59,14 +72,16 @@
 
 ## Limitaciones actuales
 
-- La persistencia sigue siendo **en memoria**; el adapter real para `DATABASE_TYPE='mongodb'` aún no existe.
+- El modo `in-memory` es útil para bootstrap y pruebas rápidas, pero no ofrece durabilidad entre ejecuciones.
 - La autenticación actual es técnica y mínima (`api_key`), no un esquema completo de usuarios/roles.
 - Aún faltan integraciones externas reales con orquestadores o proveedores.
 - La API ya normaliza `401`, `404`, `409`, `422` y `500`; futuras iteraciones deberán ampliar ejemplos OpenAPI y códigos adicionales conforme crezcan los módulos.
+- Las pruebas E2E contra MongoDB real todavía no están automatizadas en el pipeline.
 
 ## Prioridades sugeridas para la siguiente expansión
 
-1. Implementar los adaptadores NoSQL reales detrás de `resolvePersistenceAdapter(...)`.
-2. Expandir el catálogo de códigos y ejemplos OpenAPI conforme crezcan los módulos.
-3. Expandir `inventory` con valuación, auditoría extendida y consultas por almacén.
-4. Integrar el flujo real de imágenes/orquestación sobre puertos y anti-corruption layers.
+1. Validar `pnpm test:e2e` con `DATABASE_TYPE='mongodb'` y un MongoDB real levantado.
+2. Añadir pruebas de integración para los contratos de repositorio contra Mongo real (mínimo: orden FIFO, transacción con rollback).
+3. Expandir el catálogo de códigos y ejemplos OpenAPI conforme crezcan los módulos.
+4. Expandir `inventory` con valuación extendida, auditoría y consultas por almacén adicionales.
+5. Integrar el flujo real de imágenes/orquestación sobre puertos y anti-corruption layers.

@@ -2,7 +2,7 @@
 
 ## Resumen ejecutivo
 
-`inventory-service` es un backend en **NestJS + TypeScript** que expone una API REST pública versionada bajo `/api/v1`. La implementación sigue una variante de **Clean Architecture** orientada por módulos verticales (`products`, `warehouses`, `inventory`) y hoy usa **adaptadores en memoria** como bootstrap temporal mientras se prepara la persistencia NoSQL definitiva.
+`inventory-service` es un backend en **NestJS + TypeScript** que expone una API REST pública versionada bajo `/api/v1`. La implementación sigue una variante de **Clean Architecture** orientada por módulos verticales (`products`, `warehouses`, `inventory`) y soporta dos modos de persistencia seleccionables: **adaptadores en memoria** (bootstrap/pruebas) y **adaptadores MongoDB reales** con transacciones ACID.
 
 ## Stack y capacidades implementadas
 
@@ -13,6 +13,8 @@
 - **Errores HTTP**: `ApiExceptionFilter` global con envelope uniforme
 - **Pruebas**: Jest + Supertest
 - **Seguridad actual**: `ApiKeyGuard` global para `api_key`
+- **Driver de base de datos**: `mongodb@7.1.1` (driver nativo, sin ODM)
+- **Transacciones**: `ClientSession` propagado con `AsyncLocalStorage`
 
 ## Diagrama de alto nivel
 
@@ -22,9 +24,14 @@ flowchart LR
   Guard --> Http[setupHttpApplication\n/api/v1 + ValidationPipe + ApiExceptionFilter]
   Http --> App[AppModule]
 
+  App --> Mongo[MongoPersistenceModule\nGlobal]
   App --> Products[ProductsModule]
   App --> Warehouses[WarehousesModule]
   App --> Inventory[InventoryModule]
+
+  Mongo --> MC[MongoConnectionService\nonModuleInit]
+  Mongo --> MI[MongoIndexesInitializer\nonModuleInit]
+  Mongo --> MSC[MongoSessionContext\nAsyncLocalStorage]
 
   Products --> PR[PRODUCT_REPOSITORY]
   Warehouses --> WR[WAREHOUSE_REPOSITORY]
@@ -34,7 +41,8 @@ flowchart LR
   WR --> Providers
   IR --> Providers
 
-  Providers --> Mem[(Adaptadores en memoria)]
+  Providers -->|DATABASE_TYPE=in-memory| Mem[(Adaptadores en memoria)]
+  Providers -->|DATABASE_TYPE=mongodb| MDB[(MongoDB\nDriver nativo)]
 ```
 
 ## Estructura por capas
@@ -59,12 +67,27 @@ Ejemplos actuales:
 - `GetProductInventoryAvailabilityUseCase`
 
 ### 3. `infrastructure`
-Responsabilidad: adaptadores concretos y bootstrap técnico. Actualmente se usan implementaciones **in-memory** y un resolver central de persistencia.
+Responsabilidad: adaptadores concretos y bootstrap técnico. El resolver central de persistencia selecciona el adapter activo según `DATABASE_TYPE`.
 
-Ejemplos actuales:
+Adaptadores in-memory (bootstrap/pruebas):
 - `InMemoryProductRepository`
 - `InMemoryWarehouseRepository`
 - `InMemoryInventoryRepository`
+
+Adaptadores MongoDB (producción):
+- `MongoProductRepository`
+- `MongoWarehouseRepository`
+- `MongoInventoryRepository`
+- `MongoInventoryUnitOfWork`
+
+Infraestructura compartida de MongoDB:
+- `src/infrastructure/persistence/mongodb/mongodb.module.ts`
+- `src/infrastructure/persistence/mongodb/mongo-connection.service.ts`
+- `src/infrastructure/persistence/mongodb/mongodb-session.context.ts`
+- `src/infrastructure/persistence/mongodb/mongo-indexes.initializer.ts`
+- `src/infrastructure/persistence/mongodb/mongodb.tokens.ts`
+
+Resolver y wiring:
 - `src/infrastructure/persistence/repository.providers.ts`
 - `src/infrastructure/persistence/adapter.resolver.ts`
 
@@ -168,18 +191,19 @@ Modela el inventario como **movimientos + lotes FIFO**, no como un número mutab
 - La seguridad mínima obligatoria es por `api_key` técnica.
 - `DELETE` en `products` y `warehouses` se comporta como **soft delete**.
 - `inventory` expone operaciones con semántica explícita: `entries`, `exits`, `adjustments`.
-- Los repositorios actuales son en memoria para permitir avanzar la API mientras se define la capa NoSQL.
+- `DATABASE_TYPE` selecciona el adapter de persistencia en tiempo de inicio; los adaptadores in-memory son para bootstrap y pruebas.
+- El adapter MongoDB usa el **driver nativo** sin ODM; las búsquedas de texto usan campos normalizados con regex-escape.
+- Las transacciones FIFO se garantizan con `withSession + withTransaction`; la sesión se propaga con `AsyncLocalStorage` sin cambiar los puertos de dominio.
 
 ## Cómo se debe seguir expandiendo
 
-### Sustituir persistencia en memoria por NoSQL
-Mantener exactamente el mismo contrato de puertos:
-- `ProductRepository`
-- `WarehouseRepository`
-- `InventoryLotRepository`
-- `InventoryMovementRepository`
+### Extender la persistencia MongoDB existente
+Los puertos de repositorio ya tienen implementaciones MongoDB. Para extender su funcionalidad:
+- Añadir nuevos métodos de consulta al puerto correspondiente.
+- Implementarlos en el adapter Mongo respetando el mismo patrón de normalización y sesión.
+- Nunca exponer documentos crudos de Mongo fuera de la capa `infrastructure`.
 
-Solo se debe cambiar la implementación en `infrastructure`, sin filtrar documentos crudos al resto de capas.
+Si se necesita un nuevo adapter de persistencia, seguir el patrón de `adapter.resolver.ts` y `repository.providers.ts`.
 
 ### Agregar nuevos endpoints
 Si el endpoint es de dominio:
@@ -192,9 +216,10 @@ Si el endpoint es de dominio:
 
 ## Riesgos y pendientes
 
-- Falta implementar el adapter real para `DATABASE_TYPE='mongodb'`; hoy `resolvePersistenceAdapter(...)` lanza un error explícito en ese modo.
-- No hay autenticación de usuario/rol; solo protección técnica por header.
+- Los adaptadores in-memory no ofrecen durabilidad entre reinicios; usar solo para desarrollo y pruebas rápidas.
+- No hay autenticación de usuario/rol; solo protección técnica por header `api_key`.
 - La integración con orquestadores todavía no está implementada como adaptador real.
+- Las pruebas E2E con `DATABASE_TYPE='mongodb'` aún no están automatizadas contra una instancia real.
 - A medida que crezca la API habrá que ampliar el catálogo de códigos y ejemplos del filtro global de errores.
 
 ## Señales de que la arquitectura se mantiene sana

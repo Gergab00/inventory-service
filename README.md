@@ -9,7 +9,7 @@ Servicio backend construido con `NestJS + TypeScript` para gestionar productos, 
 - Documentación interactiva con Scalar en `/docs`
 - Especificación OpenAPI en `/openapi.json`
 - Módulos funcionales disponibles: `products`, `warehouses` e `inventory`
-- Persistencia bootstrap en memoria resuelta desde `src/infrastructure/persistence/repository.providers.ts`
+- Persistencia seleccionable por `DATABASE_TYPE` (`in-memory` o `mongodb`) resuelta desde `src/infrastructure/persistence/repository.providers.ts`
 
 ## Puesta en marcha local
 
@@ -37,10 +37,21 @@ Puntos útiles una vez levantado el servicio:
 | `DOCS_PATH` | No | `/docs` | Ruta donde se publica la referencia interactiva |
 | `OPENAPI_JSON_PATH` | No | `/openapi.json` | Ruta del documento OpenAPI |
 | `DATABASE_TYPE` | No | `in-memory` | Selecciona el adapter de persistencia |
-| `MONGODB_URI` | No | — | Reservada para el futuro adapter MongoDB |
-| `MONGODB_DB_NAME` | No | — | Reservada para el futuro adapter MongoDB |
+| `MONGODB_URI` | Condicional | — | Obligatoria cuando `DATABASE_TYPE='mongodb'` |
+| `MONGODB_DB_NAME` | Condicional | — | Obligatoria cuando `DATABASE_TYPE='mongodb'` |
 
-> Actualmente `DATABASE_TYPE='mongodb'` forma parte del contrato de configuración, pero el adapter real todavía no está implementado y `resolvePersistenceAdapter(...)` fallará de forma explícita.
+> Cuando `DATABASE_TYPE='mongodb'`, el servicio inicializa conexión real, crea índices de soporte y usa repositorios MongoDB en `products`, `warehouses` e `inventory`.
+
+### Arranque local con MongoDB
+
+```bash
+pnpm install
+$env:API_KEY='local-api-key'
+$env:DATABASE_TYPE='mongodb'
+$env:MONGODB_URI='mongodb://localhost:27017'
+$env:MONGODB_DB_NAME='inventory-service'
+pnpm start:dev
+```
 
 ## Superficie actual de la API
 
@@ -108,6 +119,6 @@ Si el header existe pero no coincide con la configuración, el servicio responde
 
 ## Limitaciones conocidas
 
-- La persistencia actual sigue siendo **en memoria**
+- `DATABASE_TYPE='in-memory'` sigue siendo útil para bootstrap y pruebas rápidas, pero no ofrece durabilidad
 - No existe todavía autenticación por usuarios/roles; la protección actual es técnica por `api_key`
-- Las integraciones externas reales con orquestadores y proveedor NoSQL aún están pendientes
+- Las integraciones externas reales con orquestadores aún están pendientes
