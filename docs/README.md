@@ -1,18 +1,16 @@
 # Documentación técnica de `inventory-service`
 
-## Estado actual
+## Propósito de este documento
 
-`inventory-service` expone una API REST pública y verificable bajo `/api/v1`. Este resumen está alineado con el bootstrap HTTP (`src/main.ts`, `src/infrastructure/config/http-application.setup.ts`) y con la capa de persistencia centralizada en `src/infrastructure/persistence/repository.providers.ts`.
+Este archivo evita duplicar la guía operativa del README principal y se concentra en contexto técnico-evolutivo (entregas, decisiones y prioridades).
 
-### Capacidades disponibles
+La documentación operativa y de uso diario vive en [README.md](../README.md):
 
-- **Seguridad mínima por header**: toda llamada a `/api/v1/**` exige `api_key` y se valida contra `API_KEY` del entorno. El guard también acepta `x-api-key` por compatibilidad.
-- **Módulo `products`**: creación, consulta, listado, actualización, sincronización de imágenes y soft delete.
-- **Módulo `warehouses`**: creación, consulta, listado, actualización y soft delete.
-- **Módulo `inventory`**: entradas, salidas FIFO, ajustes, consulta de disponibilidad, lotes y movimientos.
-- **Documentación interactiva**: `/docs` y `/openapi.json`.
-- **Contratos HTTP uniformes**: respuestas exitosas con `data + meta.requestId` y errores con envelope estable `error + meta`.
-- **Persistencia seleccionable y operativa**: `DATABASE_TYPE` gobierna el adapter activo; tanto `in-memory` como `mongodb` están completamente implementados y listos para producción.
+- estado actual y capacidades
+- variables de entorno y arranque
+- generación de API key
+- superficie de API y contratos HTTP
+- scripts de ejecución
 
 ## Evolución ya incorporada
 

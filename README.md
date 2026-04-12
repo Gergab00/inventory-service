@@ -42,6 +42,20 @@ Puntos útiles una vez levantado el servicio:
 
 > Cuando `DATABASE_TYPE='mongodb'`, el servicio inicializa conexión real, crea índices de soporte y usa repositorios MongoDB en `products`, `warehouses` e `inventory`.
 
+### Generar una API key segura
+
+Puedes generar una API key de 32 bytes hex con Node.js:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+También puedes usar el script del proyecto:
+
+```bash
+pnpm run generate:api-key
+```
+
 ### Arranque local con MongoDB
 
 ```bash
