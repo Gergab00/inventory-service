@@ -123,6 +123,7 @@ Si el header existe pero no coincide con la configuración, el servicio responde
 | `pnpm test` | Pruebas unitarias |
 | `pnpm test:e2e` | Pruebas end-to-end |
 | `pnpm test:cov` | Cobertura |
+| `pnpm release` | Publica una nueva versión con semantic-release (solo en CI) |
 
 ## Arquitectura y documentación complementaria
 
